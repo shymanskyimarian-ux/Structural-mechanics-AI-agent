@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шпренгельна Ферма - Аналіз Зусиль</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; }
+        canvas { background-color: #ffffff; cursor: crosshair; }
+        input[type=range] { accent-color: #4f46e5; }
+        /* Custom scrollbar for tables */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="p-2 md:p-4 h-screen flex flex-col">
+
+    <div class="max-w-[1600px] w-full mx-auto bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col lg:flex-row border border-slate-200 flex-grow">
+        
+        <!-- ПАНЕЛЬ КЕРУВАННЯ -->
+        <div class="w-full lg:w-[400px] flex flex-col h-full border-r border-slate-200 bg-slate-50 relative shrink-0">
+            
+            <div class="p-4 bg-indigo-600 text-white shadow-md z-10">
+                <h1 class="text-lg font-black uppercase tracking-wider">Шпренгельна Ферма</h1>
+                <p class="text-[10px] text-indigo-200 font-medium mt-1">Метод вузлів (Матричний розв'язок)</p>
+            </div>
+
+            <div class="p-5 overflow-y-auto flex-grow">
+                <!-- ГЕОМЕТРІЯ -->
+                <h2 class="text-sm font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-1">Розміри панелі</h2>
+                <div class="grid grid-cols-2 gap-4 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div>
+                        <label class="flex justify-between font-bold text-slate-700 text-xs mb-2">
+                            <span>Ширина d:</span><span id="valD" class="text-indigo-600">2.0 м</span>
+                        </label>
+                        <input type="range" id="sliderD" min="1" max="5" step="0.5" value="2" class="w-full">
+                    </div>
+                    <div>
+                        <label class="flex justify-between font-bold text-slate-700 text-xs mb-2">
+                            <span>Висота h:</span><span id="valH" class="text-indigo-600">3.0 м</span>
+                        </label>
+                        <input type="range" id="sliderH" min="1" max="8" step="0.5" value="3" class="w-full">
+                    </div>
+                </div>
+
+                <!-- НАВАНТАЖЕННЯ P1 -->
+                <h2 class="text-sm font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-1">Система Навантажень</h2>
+                
+                <div class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-bold text-red-700 text-sm">Зусилля P₁</span>
+                        <span id="valP1" class="font-black text-red-800 bg-red-100 px-2 py-0.5 rounded">20 кН</span>
+                    </div>
+                    <input type="range" id="sliderP1" min="0" max="100" step="5" value="20" class="w-full accent-red-600 mb-4">
+                    
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Вузол:</label>
+                            <select id="nodeP1" class="w-full p-1.5 rounded border border-red-300 font-mono">
+                                <option value="0">0 (Опора А)</option>
+                                <option value="1" selected>1 (Шпренг. низ)</option>
+                                <option value="2">2 (Основ. низ)</option>
+                                <option value="3">3 (Шпренг. низ)</option>
+                                <option value="4">4 (Основ. низ)</option>
+                                <option value="5">5 (Шпренг. низ)</option>
+                                <option value="6">6 (Опора В)</option>
+                                <option value="7">7 (Основ. верх)</option>
+                                <option value="8">8 (Основ. верх)</option>
+                                <option value="9">9 (Основ. верх)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Напрямок:</label>
+                            <select id="dirP1" class="w-full p-1.5 rounded border border-red-300 font-bold">
+                                <option value="-1" selected>Вниз ↓</option>
+                                <option value="1">Вгору ↑</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- НАВАНТАЖЕННЯ P2 -->
+                <div class="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-bold text-orange-700 text-sm">Зусилля P₂</span>
+                        <span id="valP2" class="font-black text-orange-800 bg-orange-100 px-2 py-0.5 rounded">0 кН</span>
+                    </div>
+                    <input type="range" id="sliderP2" min="0" max="100" step="5" value="0" class="w-full accent-orange-600 mb-4">
+                    
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Вузол:</label>
+                            <select id="nodeP2" class="w-full p-1.5 rounded border border-orange-300 font-mono">
+                                <option value="none">---</option>
+                                <option value="0">0 (Опора А)</option>
+                                <option value="1">1 (Шпренг. низ)</option>
+                                <option value="2">2 (Основ. низ)</option>
+                                <option value="3">3 (Шпренг. низ)</option>
+                                <option value="4">4 (Основ. низ)</option>
+                                <option value="5">5 (Шпренг. низ)</option>
+                                <option value="6">6 (Опора В)</option>
+                                <option value="7" selected>7 (Основ. верх)</option>
+                                <option value="8">8 (Основ. верх)</option>
+                                <option value="9">9 (Основ. верх)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Напрямок:</label>
+                            <select id="dirP2" class="w-full p-1.5 rounded border border-orange-300 font-bold">
+                                <option value="-1" selected>Вниз ↓</option>
+                                <option value="1">Вгору ↑</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- РЕАКЦІЇ -->
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner">
+                    <h3 class="text-xs font-bold text-yellow-400 uppercase tracking-wider mb-2 border-b border-slate-700 pb-1">Опорні реакції</h3>
+                    <div id="logReactions" class="text-sm font-mono text-emerald-300 space-y-1">
+                        <!-- Реакції тут -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВІЗУАЛІЗАЦІЯ -->
+        <div class="w-full lg:flex-1 p-4 flex flex-col bg-white overflow-hidden relative">
+            
+            <div class="flex justify-between items-end mb-2 z-10 shrink-0">
+                <div>
+                    <div class="flex gap-4 text-xs font-bold bg-slate-100 px-3 py-2 rounded-lg border border-slate-200">
+                        <span class="text-blue-600">Синій колір: Розтяг (+)</span>
+                        <span class="text-slate-300">|</span>
+                        <span class="text-red-600">Червоний колір: Стиск (-)</span>
+                        <span class="text-slate-300">|</span>
+                        <span class="text-slate-500">Сірий: Нульовий (0)</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-1 ml-1">Товщина лінії пропорційна величині зусилля.</div>
+                </div>
+            </div>
+            
+            <!-- Робоча зона: Canvas + Таблиця -->
+            <div class="flex-grow flex flex-col xl:flex-row gap-4 min-h-[400px]">
+                
+                <!-- Полотно Canvas -->
+                <div class="flex-grow border-2 border-slate-200 rounded-xl overflow-hidden relative shadow-inner bg-[#fdfdfd]">
+                    <canvas id="trussCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                </div>
+
+                <!-- Таблиця Зусиль -->
+                <div class="w-full xl:w-[280px] shrink-0 border-2 border-slate-200 rounded-xl overflow-hidden bg-white flex flex-col shadow-sm">
+                    <div class="bg-slate-100 p-2 text-center border-b border-slate-200">
+                        <h3 class="text-xs font-black text-slate-700 uppercase">Внутрішні зусилля (кН)</h3>
+                    </div>
+                    <div class="flex-grow overflow-y-auto p-2" id="effortsTable">
+                        <!-- Таблиця генерується JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('trussCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Controls
+        const UI = {
+            d: document.getElementById('sliderD'), h: document.getElementById('sliderH'),
+            valD: document.getElementById('valD'), valH: document.getElementById('valH'),
+            P1: document.getElementById('sliderP1'), valP1: document.getElementById('valP1'), nodeP1: document.getElementById('nodeP1'), dirP1: document.getElementById('dirP1'),
+            P2: document.getElementById('sliderP2'), valP2: document.getElementById('valP2'), nodeP2: document.getElementById('nodeP2'), dirP2: document.getElementById('dirP2'),
+            logReact: document.getElementById('logReactions'), effortsTable: document.getElementById('effortsTable')
+        };
+
+        const inputs = [UI.d, UI.h, UI.P1, UI.nodeP1, UI.dirP1, UI.P2, UI.nodeP2, UI.dirP2];
+        inputs.forEach(el => el.addEventListener('input', update));
+        window.addEventListener('resize', update);
+
+        // --- ТОПОЛОГІЯ ШПРЕНГЕЛЬНОЇ ФЕРМИ ---
+        function getTopology(d, h) {
+            const nodes = [
+                { id: 0, x: 0, y: 0 },   // Опора A
+                { id: 1, x: d, y: 0 },   // Шпр
+                { id: 2, x: 2*d, y: 0 }, // Осн
+                { id: 3, x: 3*d, y: 0 }, // Шпр
+                { id: 4, x: 4*d, y: 0 }, // Осн
+                { id: 5, x: 5*d, y: 0 }, // Шпр
+                { id: 6, x: 6*d, y: 0 }, // Опора B
+                { id: 7, x: d, y: h },   // Осн Верх
+                { id: 8, x: 3*d, y: h }, // Осн Верх
+                { id: 9, x: 5*d, y: h }  // Осн Верх
+            ];
+
+            const members = [
+                { n1: 0, n2: 1, cat: 3, name: "0-1" }, { n1: 1, n2: 2, cat: 3, name: "1-2" },
+                { n1: 2, n2: 3, cat: 3, name: "2-3" }, { n1: 3, n2: 4, cat: 3, name: "3-4" },
+                { n1: 4, n2: 5, cat: 3, name: "4-5" }, { n1: 5, n2: 6, cat: 3, name: "5-6" },
+                { n1: 7, n2: 8, cat: 1, name: "7-8" }, { n1: 8, n2: 9, cat: 1, name: "8-9" },
+                { n1: 0, n2: 7, cat: 1, name: "0-7" }, { n1: 2, n2: 7, cat: 1, name: "2-7" },
+                { n1: 2, n2: 8, cat: 1, name: "2-8" }, { n1: 4, n2: 8, cat: 1, name: "4-8" },
+                { n1: 4, n2: 9, cat: 1, name: "4-9" }, { n1: 6, n2: 9, cat: 1, name: "6-9" },
+                { n1: 1, n2: 7, cat: 2, name: "1-7" }, { n1: 3, n2: 8, cat: 2, name: "3-8" }, { n1: 5, n2: 9, cat: 2, name: "5-9" }
+            ];
+            return { nodes, members };
+        }
+
+        // --- МАТРИЧНИЙ СОЛВЕР ---
+        function solveLinearSystem(A, B) {
+            const n = A.length;
+            let M = A.map((row, i) => [...row, B[i]]);
+            for (let i = 0; i < n; i++) {
+                let maxEl = Math.abs(M[i][i]), maxRow = i;
+                for (let k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > maxEl) { maxEl = Math.abs(M[k][i]); maxRow = k; }
+                if (maxEl < 1e-10) return null;
+                let tmp = M[maxRow]; M[maxRow] = M[i]; M[i] = tmp;
+                for (let k = i + 1; k < n; k++) {
+                    let c = -M[k][i] / M[i][i];
+                    for (let j = i; j <= n; j++) { if (i === j) M[k][j] = 0; else M[k][j] += c * M[i][j]; }
+                }
+            }
+            let x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = M[i][n] / M[i][i];
+                for (let k = i - 1; k >= 0; k--) M[k][n] -= M[k][i] * x[i];
+            }
+            return x;
+        }
+
+        function update() {
+            const d = parseFloat(UI.d.value); const h = parseFloat(UI.h.value);
+            UI.valD.innerText = d.toFixed(1) + " м"; UI.valH.innerText = h.toFixed(1) + " м";
+            
+            const P1 = parseFloat(UI.P1.value); UI.valP1.innerText = P1 + " кН";
+            const dir1 = parseFloat(UI.dirP1.value); const node1 = parseInt(UI.nodeP1.value);
+            
+            const P2 = parseFloat(UI.P2.value); UI.valP2.innerText = P2 + " кН";
+            const dir2 = parseFloat(UI.dirP2.value); const node2 = UI.nodeP2.value === 'none' ? -1 : parseInt(UI.nodeP2.value);
+
+            let { nodes, members } = getTopology(d, h);
+
+            // Навантаження (Зовнішні сили на вузли по Y)
+            let forcesY = new Array(nodes.length).fill(0);
+            if (P1 > 0 && node1 >= 0) forcesY[node1] += P1 * dir1;
+            if (P2 > 0 && node2 >= 0) forcesY[node2] += P2 * dir2;
+
+            // Збирання матриці
+            const eqCount = nodes.length * 2; 
+            let A = Array(eqCount).fill(0).map(() => Array(eqCount).fill(0));
+            let B = Array(eqCount).fill(0);
+
+            // Стрижні
+            members.forEach((m, idx) => {
+                let n1 = nodes[m.n1], n2 = nodes[m.n2];
+                let dx = n2.x - n1.x, dy = n2.y - n1.y;
+                let len = Math.sqrt(dx*dx + dy*dy);
+                let cx = dx/len, cy = dy/len;
+                
+                A[m.n1 * 2][idx] += cx;     A[m.n1 * 2 + 1][idx] += cy;
+                A[m.n2 * 2][idx] -= cx;     A[m.n2 * 2 + 1][idx] -= cy;
+            });
+
+            // Опори: 17=Ha, 18=Va, 19=Vb
+            A[0][17] = 1; A[1][18] = 1; A[6 * 2 + 1][19] = 1;
+
+            // Навантаження (B = -F_ext)
+            for(let i=0; i<nodes.length; i++) B[i * 2 + 1] = -forcesY[i];
+
+            let X = solveLinearSystem(A, B);
+            
+            if (X) {
+                members.forEach((m, i) => { m.N = X[i]; });
+                let Ha = X[17], Va = X[18], Vb = X[19];
+
+                UI.logReact.innerHTML = `
+                    <div class="flex justify-between border-b border-slate-700 pb-1"><span>ΣX = 0 ⇒</span> <b>Ha = ${Math.abs(Ha).toFixed(2)} кН</b></div>
+                    <div class="flex justify-between border-b border-slate-700 py-1"><span>ΣM_B = 0 ⇒</span> <b>Va = ${Math.abs(Va).toFixed(2)} кН ${Va>0?'↑':'↓'}</b></div>
+                    <div class="flex justify-between pt-1"><span>ΣM_A = 0 ⇒</span> <b>Vb = ${Math.abs(Vb).toFixed(2)} кН ${Vb>0?'↑':'↓'}</b></div>
+                `;
+
+                // Оновлення таблиці зусиль
+                let tableHtml = `<div class="grid grid-cols-2 gap-1 text-[11px] font-mono">`;
+                members.forEach(m => {
+                    let color = Math.abs(m.N) < 0.01 ? "text-slate-400" : (m.N > 0 ? "text-blue-600 font-bold" : "text-red-600 font-bold");
+                    tableHtml += `
+                        <div class="flex justify-between bg-slate-50 p-1.5 rounded border border-slate-100 hover:bg-slate-100 transition-colors">
+                            <span class="text-slate-600">N<sub>${m.name}</sub></span>
+                            <span class="${color}">${m.N > 0 && m.N > 0.01 ? '+' : ''}${Math.abs(m.N) < 0.01 ? '0.0' : m.N.toFixed(1)}</span>
+                        </div>
+                    `;
+                });
+                tableHtml += `</div>`;
+                UI.effortsTable.innerHTML = tableHtml;
+
+            } else {
+                UI.logReact.innerHTML = `<span class="text-red-500">Система геометрично змінна!</span>`;
+                UI.effortsTable.innerHTML = `<span class="text-red-500 text-xs font-bold p-2">Помилка розрахунку</span>`;
+            }
+
+            drawCanvas(nodes, members, forcesY, X ? {Ha: X[17], Va: X[18], Vb: X[19]} : null);
+        }
+
+        // --- ВІЗУАЛІЗАЦІЯ ---
+        function drawCanvas(nodes, members, forcesY, reactions) {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padX = 80, padY_top = 100, padY_bot = 100;
+            const w = canvas.width - padX*2; const h_canv = canvas.height - padY_top - padY_bot;
+            
+            // Геометричні межі
+            let maxX = 0, maxY = 0;
+            nodes.forEach(n => { maxX = Math.max(maxX, n.x); maxY = Math.max(maxY, n.y); });
+            
+            const scale = Math.min(w / maxX, h_canv / maxY);
+            const x0 = canvas.width / 2 - (maxX * scale) / 2;
+            const y0 = canvas.height - padY_bot;
+
+            function toPx(x, y) { return { px: x0 + x * scale, py: y0 - y * scale }; }
+
+            let maxN = 0.01;
+            members.forEach(m => maxN = Math.max(maxN, Math.abs(m.N)));
+
+            // 1. МАЛЮВАННЯ СТРИЖНІВ (Тільки колір і товщина)
+            members.forEach(m => {
+                let p1 = toPx(nodes[m.n1].x, nodes[m.n1].y);
+                let p2 = toPx(nodes[m.n2].x, nodes[m.n2].y);
+                
+                let isTension = m.N > 0.01; let isComp = m.N < -0.01; let isZero = Math.abs(m.N) <= 0.01;
+                
+                // Товщина лінії від 2 до 10 пікселів залежно від величини
+                let thick = isZero ? 2 : 2 + (Math.abs(m.N)/maxN) * 8;
+                
+                ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py);
+                ctx.lineWidth = thick;
+                ctx.lineCap = 'round';
+                
+                if (isZero) ctx.strokeStyle = '#cbd5e1'; 
+                else ctx.strokeStyle = isTension ? '#3b82f6' : '#ef4444'; 
+                
+                ctx.stroke();
+            });
+
+            // 2. ВУЗЛИ (з нумерацією)
+            nodes.forEach(n => {
+                let p = toPx(n.x, n.y);
+                ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2);
+                ctx.fillStyle = '#ffffff'; ctx.fill();
+                ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+                
+                ctx.fillStyle = '#0f172a'; ctx.font = "bold 12px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
+                ctx.fillText(n.id, p.px, p.py + 1); // +1 visual tweak
+            });
+
+            // 3. ОПОРИ
+            function drawHingeSup(px, py) {
+                ctx.beginPath(); ctx.moveTo(px, py+10); ctx.lineTo(px - 16, py + 28); ctx.lineTo(px + 16, py + 28); ctx.closePath();
+                ctx.fillStyle = '#cbd5e1'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(px - 24, py + 28); ctx.lineTo(px + 24, py + 28); ctx.stroke();
+                for(let i=-20; i<=20; i+=8) { ctx.beginPath(); ctx.moveTo(px+i, py+28); ctx.lineTo(px+i-6, py+36); ctx.strokeStyle='#94a3b8'; ctx.stroke(); }
+            }
+            function drawRoller(px, py) {
+                ctx.beginPath(); ctx.moveTo(px, py+10); ctx.lineTo(px - 16, py + 28); ctx.lineTo(px + 16, py + 28); ctx.closePath();
+                ctx.fillStyle = '#cbd5e1'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+                ctx.beginPath(); ctx.arc(px - 8, py + 33, 5, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(px + 8, py + 33, 5, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(px - 24, py + 38); ctx.lineTo(px + 24, py + 38); ctx.stroke();
+            }
+            
+            // Assuming node 0 is support A (hinge) and node 6 is support B (roller)
+            let supA = nodes.find(n => n.id === 0);
+            let supB = nodes.find(n => n.id === 6);
+            if(supA) drawHingeSup(toPx(supA.x, supA.y).px, toPx(supA.x, supA.y).py);
+            if(supB) drawRoller(toPx(supB.x, supB.y).px, toPx(supB.x, supB.y).py);
+
+            // 4. НАВАНТАЖЕННЯ (P1, P2)
+            nodes.forEach((n, i) => {
+                if (Math.abs(forcesY[i]) > 0.01) {
+                    let p = toPx(n.x, n.y);
+                    let Pmag = Math.abs(forcesY[i]);
+                    let isDown = forcesY[i] < 0; // Напрямок сили (до центру землі)
+                    
+                    let arrColor = '#f59e0b'; // Default orange
+                    // Let's identify if it's P1 or P2 by reading UI values directly to match colors
+                    if(UI.P1.value == Pmag && UI.nodeP1.value == i) arrColor = '#dc2626'; // P1 Red
+                    else if (UI.P2.value == Pmag && UI.nodeP2.value == i) arrColor = '#ea580c'; // P2 Orange
+
+                    ctx.lineWidth = 4; ctx.strokeStyle = arrColor; ctx.fillStyle = arrColor;
+                    
+                    let ay, by;
+                    if(isDown) {
+                        ay = p.py - 60; by = p.py - 15; // Arrow goes down to node
+                    } else {
+                        ay = p.py + 60; by = p.py + 15; // Arrow goes up to node
+                    }
+
+                    // Лінія сили
+                    ctx.beginPath(); ctx.moveTo(p.px, ay); ctx.lineTo(p.px, by); ctx.stroke();
+                    // Накінечник
+                    ctx.beginPath(); 
+                    if(isDown) { ctx.moveTo(p.px, by); ctx.lineTo(p.px - 8, by - 12); ctx.lineTo(p.px + 8, by - 12); }
+                    else { ctx.moveTo(p.px, by); ctx.lineTo(p.px - 8, by + 12); ctx.lineTo(p.px + 8, by + 12); }
+                    ctx.fill();
+                    
+                    // Текст
+                    ctx.font="bold 15px Arial"; ctx.textAlign = "center";
+                    ctx.fillText(`P=${Pmag}`, p.px, isDown ? ay - 10 : ay + 15);
+                }
+            });
+
+            // 5. РЕАКЦІЇ
+            if(reactions) {
+                function dReac(val, px, py, isV, lbl) {
+                    if(Math.abs(val) < 0.01) return;
+                    let color = isV ? '#10b981' : '#8b5cf6'; 
+                    let ax=px, ay=py, bx=px, by=py;
+                    
+                    // Реакції відмальовуємо від вузла назовні для наочності
+                    if(isV) { 
+                        if(val>0) { ay+=80; by+=25; } // Реакція вгору (малюємо знизу вгору)
+                        else { ay-=40; by-=15; } // Реакція вниз
+                    } else { 
+                        if(val>0) { ax-=70; bx-=25; } // Реакція вправо
+                        else { ax+=70; bx+=25; } // Реакція вліво
+                    }
+                    
+                    ctx.lineWidth=4; ctx.strokeStyle=color; ctx.fillStyle=color;
+                    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+                    const ang = Math.atan2(by - ay, bx - ax);
+                    ctx.beginPath(); ctx.moveTo(bx, by);
+                    ctx.lineTo(bx - 10*Math.cos(ang - Math.PI/6), by - 10*Math.sin(ang - Math.PI/6));
+                    ctx.lineTo(bx - 10*Math.cos(ang + Math.PI/6), by - 10*Math.sin(ang + Math.PI/6));
+                    ctx.closePath(); ctx.fill();
+                    
+                    ctx.font="bold 14px Arial"; ctx.textAlign = isV ? "center" : (val>0 ? "right" : "left");
+                    ctx.fillText(`${lbl}=${Math.abs(val).toFixed(1)}`, ax + (isV?0:(val>0?-10:10)), ay + (isV?(val>0?15:-10):5));
+                }
+                
+                let supA = nodes.find(n => n.id === 0);
+                let supB = nodes.find(n => n.id === 6);
+                
+                if(supA) {
+                    dReac(reactions.Va, toPx(supA.x, supA.y).px, toPx(supA.x, supA.y).py, true, 'Va');
+                    dReac(reactions.Ha, toPx(supA.x, supA.y).px, toPx(supA.x, supA.y).py, false, 'Ha');
+                }
+                if(supB) {
+                    dReac(reactions.Vb, toPx(supB.x, supB.y).px, toPx(supB.x, supB.y).py, true, 'Vb');
+                }
+            }
+        }
+
+        setTimeout(update, 100);
+    </script>
+</body>
+</html>

@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Інтерактивний Аналізатор Балок Гербера</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; }
+        canvas { background-color: #ffffff; cursor: crosshair; }
+        
+        /* Стилізація повзунків */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
+        input[type=range]:focus { outline: none; }
+        
+        .diag-active { background-color: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3); }
+        .diag-inactive { background-color: white; color: #475569; border-color: #cbd5e1; }
+        .diag-inactive:hover { background-color: #f1f5f9; }
+        
+        .diag-ai-active { background-color: #7c3aed; color: white; border-color: #7c3aed; box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.3); }
+        .diag-ai-inactive { background-color: white; color: #7c3aed; border-color: #cbd5e1; }
+        .diag-ai-inactive:hover { background-color: #f5f3ff; }
+
+        .error-pulse { animation: pulseError 2s infinite; }
+        @keyframes pulseError { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-top: 3px solid #fff; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Стилі для AI відповіді */
+        .ai-text strong { color: #fcd34d; }
+        .ai-text ul { list-style-type: disc; margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .ai-text p { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body class="p-2 md:p-4 h-screen flex flex-col">
+
+    <div class="max-w-[1500px] w-full mx-auto bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col xl:flex-row border border-slate-200 flex-grow">
+        
+        <!-- ПАНЕЛЬ КЕРУВАННЯ -->
+        <div class="w-full xl:w-[450px] p-5 border-r border-slate-200 flex flex-col h-full overflow-y-auto bg-slate-50 relative">
+            
+            <h2 class="text-lg font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-2">Топологія Балки</h2>
+            
+            <!-- Додавання вузлів -->
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-4">
+                <div class="flex gap-2 mb-2">
+                    <input type="number" id="nodeX" placeholder="Коорд X (м)" class="w-1/3 p-2 border rounded text-sm font-mono">
+                    <select id="nodeType" class="w-1/3 p-2 border rounded text-xs font-bold text-slate-700">
+                        <option value="fixed">Защемлення</option>
+                        <option value="pinned">Шарн-нерухома</option>
+                        <option value="roller" selected>Каток (рухома)</option>
+                        <option value="hinge">Врізний шарнір</option>
+                    </select>
+                    <button id="btnAddNode" class="w-1/3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs transition-colors">Додати вузол</button>
+                </div>
+                <div id="nodesList" class="space-y-1 max-h-[120px] overflow-y-auto pr-1"></div>
+            </div>
+
+            <!-- Аналіз статичної визначеності -->
+            <div id="determinacyPanel" class="p-3 rounded-xl border mb-3 font-mono text-xs transition-all"></div>
+
+            <!-- Кнопка Авто-корекції (Brute-Force) -->
+            <button id="btnAutoFix" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl shadow-md transition-all uppercase tracking-wide mb-4 flex items-center justify-center gap-2 text-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
+                Збалансувати шарніри (Авто-фікс)
+            </button>
+
+            <h2 class="text-lg font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-2">Навантаження</h2>
+            
+            <!-- Повзунки навантажень -->
+            <div class="space-y-3">
+                <!-- Сила P -->
+                <div class="bg-red-50 p-3 rounded-xl border border-red-200 shadow-sm">
+                    <div class="flex justify-between font-bold text-red-700 text-xs mb-1">
+                        <span>1. Зосереджена сила P (кН)</span><span id="valP_mag">20</span>
+                    </div>
+                    <input type="range" id="loadP_mag" min="-50" max="50" step="1" value="20">
+                    <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mt-2">
+                        <span>Розташування X:</span><span id="valP_pos">3.0 м</span>
+                    </div>
+                    <input type="range" id="loadP_pos" min="0" max="12" step="0.1" value="3">
+                </div>
+
+                <!-- Момент M -->
+                <div class="bg-orange-50 p-3 rounded-xl border border-orange-200 shadow-sm">
+                    <div class="flex justify-between font-bold text-orange-700 text-xs mb-1">
+                        <span>2. Зосереджений момент M (кН·м)</span><span id="valM_mag">0</span>
+                    </div>
+                    <input type="range" id="loadM_mag" min="-50" max="50" step="1" value="0">
+                    <div class="text-[9px] text-orange-600 mb-1 font-bold">+ проти годинникової, - за годинниковою</div>
+                    <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mt-1">
+                        <span>Розташування X:</span><span id="valM_pos">0.0 м</span>
+                    </div>
+                    <input type="range" id="loadM_pos" min="0" max="12" step="0.1" value="0">
+                </div>
+
+                <!-- Розподілене q -->
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 shadow-sm">
+                    <div class="flex justify-between font-bold text-emerald-700 text-xs mb-1">
+                        <span>3. Розподілене навантаження q (кН/м)</span><span id="valQ_mag">10</span>
+                    </div>
+                    <input type="range" id="loadQ_mag" min="-30" max="30" step="1" value="-10">
+                    
+                    <div class="grid grid-cols-2 gap-3 mt-2">
+                        <div>
+                            <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mb-1">
+                                <span>Від X:</span><span id="valQ_pos">6.0 м</span>
+                            </div>
+                            <input type="range" id="loadQ_pos" min="0" max="12" step="0.1" value="6">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mb-1">
+                                <span>Довжина:</span><span id="valQ_len">6.0 м</span>
+                            </div>
+                            <input type="range" id="loadQ_len" min="0" max="12" step="0.1" value="6">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВІЗУАЛІЗАЦІЯ -->
+        <div class="w-full xl:flex-1 p-4 md:p-6 flex flex-col bg-white overflow-hidden">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div>
+                    <h2 id="diagramTitle" class="text-2xl font-black text-slate-800 tracking-tight">Розрахункова Схема</h2>
+                    <p id="diagramDesc" class="text-xs text-slate-500 mt-1 font-medium">Базовий вигляд балки з навантаженнями та опорами.</p>
+                </div>
+                
+                <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm shrink-0 flex-wrap">
+                    <button id="btnDiagBeam" class="px-3 py-1.5 text-xs font-black rounded diag-active transition-all">Балка</button>
+                    <button id="btnDiagFloor" class="px-3 py-1.5 text-xs font-black rounded diag-inactive transition-all border-l border-slate-300">Поверхова Схема</button>
+                    <button id="btnDiagM" class="px-3 py-1.5 text-xs font-black rounded diag-inactive transition-all border-l border-slate-300">Епюра M</button>
+                    <button id="btnDiagQ" class="px-3 py-1.5 text-xs font-black rounded diag-inactive transition-all border-l border-slate-300">Епюра Q</button>
+                    <button id="btnDiagAI" class="px-3 py-1.5 text-xs font-black rounded diag-ai-inactive transition-all border-l border-slate-300 ml-2">✨ AI Експерт</button>
+                </div>
+            </div>
+            
+            <!-- Контейнер для візуалізації -->
+            <div class="flex-grow border-2 border-slate-200 rounded-xl overflow-hidden relative shadow-inner bg-[#fafafa] min-h-[400px]">
+                <!-- Полотно Canvas -->
+                <canvas id="beamCanvas" class="absolute inset-0 w-full h-full z-10"></canvas>
+                
+                <!-- AI Контейнер -->
+                <div id="aiContainer" class="hidden absolute inset-0 w-full h-full bg-slate-900 z-20 flex-col p-6 overflow-hidden">
+                    <div class="text-white mb-4">
+                        <h3 class="text-xl font-bold text-purple-400 mb-2">Інженерний Аналіз від Gemini AI ✨</h3>
+                        <p class="text-sm text-slate-300">
+                            ШІ згенерує детальний опис вашої багатопролітної балки Гербера. Він проаналізує статичну визначеність, розстановку врізних шарнірів, розподіл зусиль та вкаже на найслабші місця конструкції.
+                        </p>
+                    </div>
+                    <button id="btnAskGemini" class="w-full md:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all flex justify-center items-center mb-4">
+                        <span>✨ Проаналізувати поточну схему</span>
+                    </button>
+                    <div class="flex-grow overflow-y-auto bg-slate-800 rounded-lg p-4 border border-slate-700">
+                        <div id="aiResultText" class="text-slate-200 text-sm leading-relaxed ai-text font-serif">
+                            <span class="text-slate-500 italic">Натисніть кнопку вище, щоб відправити запит до ШІ...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Математичний лог і перевірка рівноваги -->
+            <div class="mt-4 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner z-0">
+                <h3 class="text-[11px] font-bold text-yellow-400 uppercase tracking-wider mb-2 border-b border-slate-700 pb-1">Рівновага Системи та Реакції Опор</h3>
+                <div id="logOutput" class="text-xs font-mono text-emerald-300 grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('beamCanvas');
+        const ctx = canvas.getContext('2d');
+        const aiContainer = document.getElementById('aiContainer');
+
+        // Стан системи
+        let nodes = [
+            { id: 1, x: 0, type: 'fixed' },
+            { id: 2, x: 2, type: 'hinge' },
+            { id: 3, x: 4, type: 'roller' },
+            { id: 4, x: 6, type: 'hinge' },
+            { id: 5, x: 8, type: 'roller' },
+            { id: 6, x: 12, type: 'roller'}
+        ];
+        
+        let activeDiag = 'Beam'; // Beam, Floor, M, Q, AI
+        let mathState = { isValid: false, reactions: [], isDeterminate: false };
+        let maxL = 12;
+
+        // UI Елементи
+        const UI = {
+            nodeX: document.getElementById('nodeX'), nodeType: document.getElementById('nodeType'),
+            btnAddNode: document.getElementById('btnAddNode'), nodesList: document.getElementById('nodesList'),
+            detPanel: document.getElementById('determinacyPanel'), btnAutoFix: document.getElementById('btnAutoFix'),
+            p_mag: document.getElementById('loadP_mag'), p_pos: document.getElementById('loadP_pos'),
+            m_mag: document.getElementById('loadM_mag'), m_pos: document.getElementById('loadM_pos'),
+            q_mag: document.getElementById('loadQ_mag'), q_pos: document.getElementById('loadQ_pos'), q_len: document.getElementById('loadQ_len'),
+            valP_mag: document.getElementById('valP_mag'), valP_pos: document.getElementById('valP_pos'),
+            valM_mag: document.getElementById('valM_mag'), valM_pos: document.getElementById('valM_pos'),
+            valQ_mag: document.getElementById('valQ_mag'), valQ_pos: document.getElementById('valQ_pos'), valQ_len: document.getElementById('valQ_len'),
+            logOutput: document.getElementById('logOutput'),
+            btnDiagBeam: document.getElementById('btnDiagBeam'), btnDiagFloor: document.getElementById('btnDiagFloor'), 
+            btnDiagM: document.getElementById('btnDiagM'), btnDiagQ: document.getElementById('btnDiagQ'), btnDiagAI: document.getElementById('btnDiagAI'),
+            title: document.getElementById('diagramTitle'), desc: document.getElementById('diagramDesc'),
+            btnAskGemini: document.getElementById('btnAskGemini'), aiResultText: document.getElementById('aiResultText')
+        };
+
+        // --- Управління Вкладками ---
+        function setDiagram(d, btn) {
+            activeDiag = d;
+            [UI.btnDiagBeam, UI.btnDiagFloor, UI.btnDiagM, UI.btnDiagQ].forEach(b => { 
+                b.classList.remove('diag-active'); b.classList.add('diag-inactive'); 
+            });
+            UI.btnDiagAI.classList.remove('diag-ai-active');
+            UI.btnDiagAI.classList.add('diag-ai-inactive');
+            
+            if (d === 'AI') {
+                btn.classList.remove('diag-ai-inactive'); btn.classList.add('diag-ai-active');
+                UI.title.innerText = 'Аналітика Gemini AI ✨'; 
+                UI.desc.innerText = 'Отримайте експертний висновок від ШІ щодо поточної розрахункової схеми.';
+                canvas.classList.add('hidden');
+                aiContainer.classList.remove('hidden');
+                aiContainer.classList.add('flex');
+            } else {
+                btn.classList.remove('diag-inactive'); btn.classList.add('diag-active');
+                if(d === 'Beam') { UI.title.innerText = 'Розрахункова Схема'; UI.desc.innerText = 'Базовий вигляд балки з навантаженнями та опорами.'; }
+                if(d === 'Floor') { UI.title.innerText = 'Поверхова Схема'; UI.desc.innerText = 'Ієрархія взаємодії: Головні балки (внизу) тримають підвісні балки (зверху).'; }
+                if(d === 'M') { UI.title.innerText = 'Епюра Згинальних Моментів M(x)'; UI.desc.innerHTML = 'Побудована з боку <b>розтягнутих волокон</b>.'; }
+                if(d === 'Q') { UI.title.innerText = 'Епюра Поперечних Сил Q(x)'; UI.desc.innerHTML = 'Відкладається зі знаками <b>(+)</b> та <b>(-)</b>.'; }
+                aiContainer.classList.add('hidden');
+                aiContainer.classList.remove('flex');
+                canvas.classList.remove('hidden');
+                render();
+            }
+        }
+        UI.btnDiagBeam.addEventListener('click', () => setDiagram('Beam', UI.btnDiagBeam));
+        UI.btnDiagFloor.addEventListener('click', () => setDiagram('Floor', UI.btnDiagFloor));
+        UI.btnDiagM.addEventListener('click', () => setDiagram('M', UI.btnDiagM));
+        UI.btnDiagQ.addEventListener('click', () => setDiagram('Q', UI.btnDiagQ));
+        UI.btnDiagAI.addEventListener('click', () => setDiagram('AI', UI.btnDiagAI));
+
+        // --- Оновлення Слайдерів ---
+        function updateSlidersMax() {
+            if(nodes.length === 0) return;
+            maxL = Math.max(...nodes.map(n => n.x));
+            [UI.p_pos, UI.m_pos, UI.q_pos, UI.q_len].forEach(el => { el.max = maxL; });
+        }
+
+        function readLoads() {
+            let loads = [];
+            const P = parseFloat(UI.p_mag.value); const Px = parseFloat(UI.p_pos.value);
+            UI.valP_mag.innerText = P; UI.valP_pos.innerText = Px.toFixed(1) + " м";
+            if(P !== 0) loads.push({type: 'P', mag: P, x: Px}); // P>0 is force DOWN
+            
+            const M = parseFloat(UI.m_mag.value); const Mx = parseFloat(UI.m_pos.value);
+            UI.valM_mag.innerText = M; UI.valM_pos.innerText = Mx.toFixed(1) + " м";
+            if(M !== 0) loads.push({type: 'M', mag: M, x: Mx}); // M>0 is CCW
+            
+            const Q = parseFloat(UI.q_mag.value); 
+            let Qs = parseFloat(UI.q_pos.value); let Qlen = parseFloat(UI.q_len.value);
+            if (Qs + Qlen > maxL) { Qlen = maxL - Qs; UI.q_len.value = Qlen; }
+            UI.valQ_mag.innerText = Q; UI.valQ_pos.innerText = Qs.toFixed(1) + " м"; UI.valQ_len.innerText = Qlen.toFixed(1) + " м";
+            if(Q !== 0 && Qlen > 0) loads.push({type: 'q', mag: -Q, start: Qs, end: Qs + Qlen}); 
+            
+            return loads;
+        }
+
+        [UI.p_mag, UI.p_pos, UI.m_mag, UI.m_pos, UI.q_mag, UI.q_pos, UI.q_len].forEach(el => el.addEventListener('input', () => analyzeSystem()));
+
+        // --- Вузли ---
+        UI.btnAddNode.addEventListener('click', () => {
+            const x = parseFloat(UI.nodeX.value);
+            if(isNaN(x)) return;
+            nodes = nodes.filter(n => Math.abs(n.x - x) > 0.01);
+            nodes.push({ id: Date.now(), x: x, type: UI.nodeType.value });
+            nodes.sort((a,b) => a.x - b.x);
+            updateSlidersMax(); analyzeSystem();
+        });
+
+        window.removeNode = function(id) { 
+            nodes = nodes.filter(n => n.id !== id); 
+            updateSlidersMax(); analyzeSystem(); 
+        }
+
+        function renderNodeList() {
+            UI.nodesList.innerHTML = '';
+            nodes.forEach(n => {
+                let tName = {fixed: 'Защемлення', pinned: 'Шарн-Нерух.', roller: 'Рухома', hinge: 'Шарнір'}[n.type];
+                let color = n.type === 'hinge' ? 'text-orange-600' : 'text-blue-600';
+                UI.nodesList.innerHTML += `
+                    <div class="flex justify-between items-center bg-slate-100 p-1.5 rounded border border-slate-200 text-xs mb-1">
+                        <span class="font-mono font-bold ${color}">x=${n.x}м : ${tName}</span>
+                        <button onclick="removeNode(${n.id})" class="text-red-500 hover:text-red-700 font-bold px-2">&times;</button>
+                    </div>`;
+            });
+        }
+
+        // --- МАТЕМАТИЧНИЙ РУШІЙ (Гаус) ---
+        function solveLinearSystem(A, B) {
+            const n = A.length;
+            for (let i = 0; i < n; i++) {
+                let maxEl = Math.abs(A[i][i]), maxRow = i;
+                for (let k = i + 1; k < n; k++) if (Math.abs(A[k][i]) > maxEl) { maxEl = Math.abs(A[k][i]); maxRow = k; }
+                if (maxEl < 1e-8) return null; 
+                let tmp = A[maxRow]; A[maxRow] = A[i]; A[i] = tmp;
+                tmp = B[maxRow]; B[maxRow] = B[i]; B[i] = tmp;
+                for (let k = i + 1; k < n; k++) {
+                    let c = -A[k][i] / A[i][i];
+                    for (let j = i; j < n; j++) { if (i === j) A[k][j] = 0; else A[k][j] += c * A[i][j]; }
+                    B[k] += c * B[i];
+                }
+            }
+            let x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = B[i] / A[i][i];
+                for (let k = i - 1; k >= 0; k--) B[k] -= A[k][i] * x[i];
+            }
+            return x;
+        }
+
+        function analyzeSystem() {
+            renderNodeList();
+            let loads = readLoads();
+            
+            let unknowns = []; 
+            let numHinges = 0;
+            
+            nodes.forEach(n => {
+                if (n.type === 'fixed') { unknowns.push({type: 'Vy', x: n.x}); unknowns.push({type: 'M', x: n.x}); }
+                else if (n.type === 'pinned' || n.type === 'roller') { unknowns.push({type: 'Vy', x: n.x}); }
+                else if (n.type === 'hinge') { numHinges++; }
+            });
+
+            let eqCount = 2 + numHinges; // ΣFy=0, ΣM=0 + ΣM_h=0
+            mathState.isDeterminate = (unknowns.length === eqCount);
+            
+            let detHtml = `<div class="font-bold mb-1">Ступінь свободи:</div>
+                           <div>Невідомих реакцій (R): ${unknowns.length}</div>
+                           <div>Рівнянь (2) + Шарнірів (${numHinges}) = ${eqCount}</div>`;
+            
+            if (mathState.isDeterminate) {
+                UI.detPanel.className = "p-3 rounded-xl border mb-3 font-mono text-xs bg-emerald-50 border-emerald-300 text-emerald-800";
+                detHtml += `<div class="mt-2 font-black text-emerald-600 text-[11px]">Система СТАТИЧНО ВИЗНАЧЕНА ✓</div>`;
+            } else if (unknowns.length > eqCount) {
+                UI.detPanel.className = "p-3 rounded-xl border mb-3 font-mono text-xs bg-red-50 border-red-300 text-red-800 error-pulse";
+                detHtml += `<div class="mt-2 font-black text-red-600 text-[11px]">СТАТИЧНО НЕВИЗНАЧЕНА (${unknowns.length - eqCount} разів) ✗</div>`;
+            } else {
+                UI.detPanel.className = "p-3 rounded-xl border mb-3 font-mono text-xs bg-red-50 border-red-300 text-red-800 error-pulse";
+                detHtml += `<div class="mt-2 font-black text-red-600 text-[11px]">ГЕОМЕТРИЧНО ЗМІННА (Механізм) ✗</div>`;
+            }
+            UI.detPanel.innerHTML = detHtml;
+
+            mathState.isValid = false;
+            UI.logOutput.innerHTML = '';
+            mathState.reactions = [];
+            
+            if (mathState.isDeterminate && unknowns.length > 0) {
+                let N = unknowns.length;
+                let A = Array(N).fill(0).map(() => Array(N).fill(0));
+                let B = Array(N).fill(0);
+
+                let sumFy_load = 0; let sumM_load_origin = 0; 
+                loads.forEach(ld => {
+                    if(ld.type === 'P') { sumFy_load += ld.mag; sumM_load_origin += ld.mag * ld.x; } 
+                    if(ld.type === 'M') { sumM_load_origin -= ld.mag; } 
+                    if(ld.type === 'q') { let F = ld.mag * (ld.end - ld.start); sumFy_load += F; sumM_load_origin += F * (ld.start + (ld.end-ld.start)/2); }
+                });
+
+                // Eq 0: ΣFy = 0 
+                for(let j=0; j<N; j++) { if(unknowns[j].type === 'Vy') A[0][j] = 1; }
+                B[0] = sumFy_load;
+
+                // Eq 1: ΣM_origin = 0 
+                for(let j=0; j<N; j++) {
+                    if(unknowns[j].type === 'Vy') A[1][j] = unknowns[j].x;
+                    if(unknowns[j].type === 'M') A[1][j] = 1; 
+                }
+                B[1] = sumM_load_origin;
+
+                // Eq 2+: ΣM_hinge_left = 0
+                let eqIdx = 2;
+                nodes.filter(n => n.type === 'hinge').forEach(h => {
+                    let m_load_h = 0;
+                    loads.forEach(ld => {
+                        if(ld.type === 'P' && ld.x < h.x) m_load_h += ld.mag * (h.x - ld.x);
+                        if(ld.type === 'M' && ld.x < h.x) m_load_h -= ld.mag;
+                        if(ld.type === 'q' && ld.start < h.x) {
+                            let e = Math.min(ld.end, h.x); let F = ld.mag * (e - ld.start);
+                            m_load_h += F * (h.x - (ld.start + (e-ld.start)/2));
+                        }
+                    });
+
+                    for(let j=0; j<N; j++) {
+                        if(unknowns[j].x <= h.x + 1e-5) {
+                            if(unknowns[j].type === 'Vy') A[eqIdx][j] = h.x - unknowns[j].x;
+                            if(unknowns[j].type === 'M') A[eqIdx][j] = 1;
+                        }
+                    }
+                    B[eqIdx] = m_load_h;
+                    eqIdx++;
+                });
+
+                let X = solveLinearSystem(A, B);
+                
+                if (X) {
+                    mathState.isValid = true;
+                    mathState.reactions = unknowns.map((u, i) => ({...u, val: X[i]}));
+                    
+                    mathState.reactions.forEach(r => {
+                        let lbl = r.type === 'Vy' ? 'V' : 'M';
+                        UI.logOutput.innerHTML += `<div>${lbl}(${r.x}m) = <span class="text-white">${r.val.toFixed(2)}</span></div>`;
+                    });
+                    
+                    let checkY = -sumFy_load; let checkM = -sumM_load_origin;
+                    mathState.reactions.forEach(r => {
+                        if(r.type === 'Vy') { checkY += r.val; checkM += r.val * r.x; }
+                        if(r.type === 'M') { checkM += r.val; }
+                    });
+                    UI.logOutput.innerHTML += `<div class="col-span-2 md:col-span-4 mt-1 pt-1 border-t border-slate-700 text-[10px] text-slate-400">
+                        Перевірка: ΣY = ${Math.abs(checkY)<0.01?'0.00 (ОК)':checkY.toFixed(3)}, ΣM_0 = ${Math.abs(checkM)<0.01?'0.00 (ОК)':checkM.toFixed(3)}
+                    </div>`;
+
+                } else {
+                    UI.logOutput.innerHTML = `<div class="col-span-4 text-red-400">Схема є миттєво-змінною (механізм). Змініть позиції шарнірів.</div>`;
+                }
+            } else {
+                UI.logOutput.innerHTML = `<div class="col-span-4 text-slate-500">Система не визначена. Розрахунок зупинено.</div>`;
+            }
+
+            render();
+        }
+
+        // --- АВТОКОРЕКЦІЯ (Brute-Force) ---
+        UI.btnAutoFix.addEventListener('click', () => {
+            nodes = nodes.filter(n => n.type !== 'hinge'); nodes.sort((a,b) => a.x - b.x);
+            let R = 0; nodes.forEach(n => { if(n.type === 'fixed') R+=2; if(n.type==='roller'||n.type==='pinned') R+=1; });
+            let reqHinges = R - 2;
+            
+            if (reqHinges <= 0) { alert("Система вже визначена або є механізмом!"); analyzeSystem(); return; }
+            
+            let candidates = [];
+            for(let i=0; i<nodes.length-1; i++) {
+                let n1 = nodes[i], n2 = nodes[i+1]; let L = n2.x - n1.x;
+                candidates.push(n1.x + L*0.2); candidates.push(n1.x + L*0.5); candidates.push(n1.x + L*0.8);
+            }
+            
+            function getCombinations(arr, k) {
+                let i, j, combs, head, tailcombs;
+                if (k > arr.length || k <= 0) return [];
+                if (k === arr.length) return [arr];
+                if (k === 1) { combs = []; for (i = 0; i < arr.length; i++) combs.push([arr[i]]); return combs; }
+                combs = [];
+                for (i = 0; i < arr.length - k + 1; i++) {
+                    head = arr.slice(i, i + 1);
+                    tailcombs = getCombinations(arr.slice(i + 1), k - 1);
+                    for (j = 0; j < tailcombs.length; j++) combs.push(head.concat(tailcombs[j]));
+                }
+                return combs;
+            }
+            
+            let allCombs = getCombinations(candidates, reqHinges);
+            let originalNodes = [...nodes];
+            let found = false;
+
+            for(let c of allCombs) {
+                nodes = [...originalNodes];
+                c.forEach(hx => nodes.push({id: Math.random(), x: hx, type: 'hinge'}));
+                nodes.sort((a,b) => a.x - b.x);
+                
+                let validDist = true;
+                for(let i=0; i<originalNodes.length-1; i++) {
+                    let hCount = nodes.filter(n => n.type==='hinge' && n.x > originalNodes[i].x && n.x < originalNodes[i+1].x).length;
+                    if(hCount > 2) validDist = false;
+                }
+                
+                if(validDist) {
+                    analyzeSystem(); 
+                    if(mathState.isValid) { found = true; break; }
+                }
+            }
+
+            if(!found) {
+                alert("Не вдалося знайти стабільну конфігурацію автоматично.");
+                nodes = [...originalNodes]; analyzeSystem();
+            }
+        });
+
+        // --- GEMINI API INTEGRATION ---
+        // Implement Exponential Backoff
+        async function fetchWithRetry(url, options, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        UI.btnAskGemini.addEventListener('click', async () => {
+            const apiKey = ""; // API Key injected by environment
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            UI.btnAskGemini.innerHTML = `<span class="spinner"></span> Звертаюся до ШІ...`;
+            UI.btnAskGemini.disabled = true;
+            UI.aiResultText.innerHTML = `<div class="flex justify-center my-8"><span class="spinner !border-purple-500 !border-t-white"></span> <span class="text-purple-300 ml-2">ШІ формує інженерний висновок...</span></div>`;
+
+            // Prepare context for AI
+            const loads = readLoads();
+            let loadStr = loads.length === 0 ? "Відсутні" : loads.map(l => {
+                if (l.type === 'P') return `Зосереджена сила ${l.mag} кН на X=${l.x}м`;
+                if (l.type === 'M') return `Момент ${l.mag} кН·м на X=${l.x}м`;
+                if (l.type === 'q') return `Розподілене ${Math.abs(l.mag)} кН/м від X=${l.start}м до ${l.end}м`;
+            }).join("; ");
+
+            let nodeStr = nodes.map(n => {
+                let nName = {fixed: 'Защемлення', pinned: 'Шарнірно-нерухома опора', roller: 'Рухома опора', hinge: 'Врізний шарнір'}[n.type];
+                return `${nName} (X=${n.x}м)`;
+            }).join("; ");
+
+            let reactionStr = "Не розраховано (некоректна схема)";
+            if (mathState.isValid) {
+                reactionStr = mathState.reactions.map(r => `${r.type} на X=${r.x}м: ${r.val.toFixed(2)}`).join("; ");
+            }
+
+            const prompt = `Ти — Senior інженер-будівельник та викладач. Проаналізуй поточний стан багатопролітної балки Гербера.
+Топологія (вузли): ${nodeStr}.
+Навантаження: ${loadStr}.
+Статична визначеність: ${mathState.isDeterminate ? "Система статично визначена." : "Система статично невизначена або змінна!"}
+Реакції (якщо схема коректна): ${reactionStr}.
+
+Завдання:
+1. Коротко поясни, як система передає навантаження (де знаходяться головні балки, а де підвісні).
+2. Якщо схема статично визначена і навантажена: де очікується найбільший згинальний момент та чому?
+3. Якщо схема некоректна (невизначена або механізм), поясни чому це так з точки зору кінематичного аналізу.
+
+Відповідай лаконічно (2-3 абзаци), професійною українською мовою. Використовуй звичайний текст, виділяй головне жирним шрифтом (через **текст**). Без використання LaTeX.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: "Ти AI-асистент будівельного інженера. Твоя мета - пояснювати статику конструкцій." }] }
+            };
+
+            try {
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>').replace(/\* (.*?)<br\/>/g, '<ul><li>$1</li></ul>');
+                    UI.aiResultText.innerHTML = formattedText;
+                } else {
+                    throw new Error("No text in response");
+                }
+            } catch (error) {
+                UI.aiResultText.innerHTML = `<span class="text-red-400 font-bold">Помилка з'єднання з API Gemini. Спробуйте ще раз.</span>`;
+            } finally {
+                UI.btnAskGemini.innerHTML = `✨ Проаналізувати поточну схему`;
+                UI.btnAskGemini.disabled = false;
+            }
+        });
+
+
+        // --- ВІЗУАЛІЗАЦІЯ CANVAS ---
+        window.addEventListener('resize', render);
+
+        function getForcesAtX(x) {
+            let Q = 0, M = 0;
+            if(!mathState.isValid) return {Q:0, M:0};
+            let loads = readLoads();
+            
+            mathState.reactions.forEach(r => {
+                if(r.x < x || Math.abs(r.x - x) < 1e-6) {
+                    if(r.type === 'Vy') { Q += r.val; M += r.val * (x - r.x); }
+                    if(r.type === 'M') { M += r.val; } 
+                }
+            });
+            
+            loads.forEach(ld => {
+                if(ld.type === 'P' && ld.x < x) { Q -= ld.mag; M -= ld.mag * (x - ld.x); }
+                if(ld.type === 'M' && ld.x < x) { M += ld.mag; }
+                if(ld.type === 'q' && ld.start < x) {
+                    let endX = Math.min(ld.end, x); let len = endX - ld.start; let F = ld.mag * len;
+                    Q -= F; M -= F * (x - (ld.start + len/2));
+                }
+            });
+            return {Q, M};
+        }
+
+        function render() {
+            if (activeDiag === 'AI') return; // Canvas is hidden
+
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if(nodes.length < 2) return;
+            const minX = nodes[0].x; const maxX = nodes[nodes.length-1].x; const totalL = maxX - minX;
+            if(totalL <= 0) return;
+
+            const padX = 60, padY = 180;
+            const w = canvas.width - padX*2; const scaleX = w / totalL;
+            const y0 = canvas.height / 2 + 30; // Опустив нижче
+
+            function toPx(x) { return padX + (x - minX) * scaleX; }
+
+            // Малювання базової схеми / епюр
+            if (activeDiag === 'Floor') {
+                // ПОВЕРХОВА СХЕМА
+                let disks = []; let sIdx = 0;
+                for(let i=0; i<nodes.length; i++) {
+                    if(nodes[i].type === 'hinge' || i === nodes.length-1) {
+                        let segNodes = nodes.slice(sIdx, i+1);
+                        let supCount = segNodes.filter(n => n.type==='fixed').length * 2 + segNodes.filter(n => n.type==='roller' || n.type==='pinned').length;
+                        disks.push({start: nodes[sIdx].x, end: nodes[i].x, sups: supCount});
+                        sIdx = i; 
+                    }
+                }
+                
+                ctx.lineWidth = 8; ctx.lineCap = 'round';
+                disks.forEach(d => {
+                    let levelY = y0;
+                    if(d.sups >= 2) levelY = y0 + 50; 
+                    else if(d.sups === 1) levelY = y0 - 10; 
+                    else levelY = y0 - 70; 
+                    
+                    ctx.strokeStyle = d.sups >= 2 ? '#3b82f6' : (d.sups===1 ? '#f59e0b' : '#ef4444');
+                    ctx.beginPath(); ctx.moveTo(toPx(d.start), levelY); ctx.lineTo(toPx(d.end), levelY); ctx.stroke();
+                    
+                    if(d.sups < 2) {
+                        ctx.setLineDash([5,5]); ctx.lineWidth = 1; ctx.strokeStyle = '#94a3b8';
+                        ctx.beginPath(); ctx.moveTo(toPx(d.start), y0 - 70); ctx.lineTo(toPx(d.start), y0 + 50); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(toPx(d.end), y0 - 70); ctx.lineTo(toPx(d.end), y0 + 50); ctx.stroke();
+                        ctx.setLineDash([]); ctx.lineWidth = 8;
+                    }
+                });
+                
+                ctx.fillStyle = '#0f172a'; ctx.font = "bold 12px Arial"; ctx.textAlign="center";
+                ctx.fillText("Головні балки", canvas.width/2, y0 + 80);
+                ctx.fillText("Підвісні балки", canvas.width/2, y0 - 90);
+
+            } else {
+                // ЕПЮРИ M ТА Q
+                if (!mathState.isValid && activeDiag !== 'Beam') {
+                    ctx.fillStyle = '#ef4444'; ctx.font = "bold 18px Arial"; ctx.textAlign="center";
+                    ctx.fillText("Система не розв'язана. Виправте в'язі.", canvas.width/2, y0 - 50);
+                } else if (mathState.isValid && activeDiag !== 'Beam') {
+                    const STEPS = 500; let maxVal = 0.01; let pts = [];
+                    for(let i=0; i<=STEPS; i++) {
+                        let x = minX + (i/STEPS)*totalL;
+                        let v = getForcesAtX(x);
+                        let val = activeDiag === 'M' ? v.M : v.Q;
+                        maxVal = Math.max(maxVal, Math.abs(val));
+                        pts.push({x: x, val: val});
+                    }
+                    const scaleY = (canvas.height/2 - padY/2) / maxVal;
+
+                    ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(toPx(minX), y0);
+                    pts.forEach(p => {
+                        let y = y0;
+                        if(activeDiag === 'M') y += p.val * scaleY; else y -= p.val * scaleY;
+                        ctx.lineTo(toPx(p.x), y);
+                    });
+                    ctx.lineTo(toPx(maxX), y0); ctx.closePath();
+                    ctx.fillStyle = activeDiag === 'M' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+                    ctx.fill(); ctx.strokeStyle = activeDiag === 'M' ? '#ca8a04' : '#2563eb'; ctx.stroke();
+
+                    for(let i=0; i<pts.length; i+=10) {
+                        let y = y0 + (activeDiag === 'M' ? pts[i].val : -pts[i].val) * scaleY;
+                        ctx.beginPath(); ctx.moveTo(toPx(pts[i].x), y0); ctx.lineTo(toPx(pts[i].x), y);
+                        ctx.strokeStyle = (activeDiag==='Q' && pts[i].val<0) ? 'rgba(239, 68, 68, 0.5)' : (activeDiag==='M' ? 'rgba(234, 179, 8, 0.5)' : 'rgba(59, 130, 246, 0.5)');
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle = '#0f172a'; ctx.font = "bold 11px Arial"; ctx.textAlign="center";
+                    let importantPts = [...nodes.map(n=>n.x)];
+                    readLoads().forEach(ld => { if(ld.type==='P'||ld.type==='M') importantPts.push(ld.x); if(ld.type==='q') { importantPts.push(ld.start); importantPts.push(ld.start+(ld.end-ld.start)/2); importantPts.push(ld.end); } });
+                    
+                    let uniquePts = [...new Set(importantPts)];
+                    uniquePts.forEach(x => {
+                        if(x < minX || x > maxX) return;
+                        let v = getForcesAtX(x); let val = activeDiag === 'M' ? v.M : v.Q;
+                        if(Math.abs(val) > 0.05) {
+                            let px = toPx(x); let py = y0 + (activeDiag === 'M' ? val : -val) * scaleY;
+                            ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+                            ctx.fillText(Math.abs(val).toFixed(1), px, py + (activeDiag==='M' ? (val>0?15:-10) : (val>0?-10:15)));
+                        }
+                    });
+                }
+                
+                // ВІСЬ БАЛКИ
+                ctx.lineWidth = 4; ctx.strokeStyle = '#1e293b'; ctx.beginPath();
+                ctx.moveTo(toPx(minX), y0); ctx.lineTo(toPx(maxX), y0); ctx.stroke();
+                
+                // ВУЗЛИ
+                nodes.forEach(n => {
+                    let px = toPx(n.x);
+                    if (n.type === 'hinge') {
+                        ctx.beginPath(); ctx.arc(px, y0, 6, 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+                        ctx.lineWidth=2.5; ctx.strokeStyle='#ef4444'; ctx.stroke();
+                    } else if (n.type === 'fixed') {
+                        ctx.beginPath(); ctx.moveTo(px, y0-25); ctx.lineTo(px, y0+25); ctx.lineWidth=5; ctx.strokeStyle='#1e293b'; ctx.stroke();
+                        for(let i=-25; i<=25; i+=6) { ctx.beginPath(); ctx.moveTo(px, y0+i); ctx.lineTo(px-12, y0+i+12); ctx.lineWidth=1; ctx.stroke(); }
+                    } else if (n.type === 'roller' || n.type === 'pinned') {
+                        ctx.beginPath(); ctx.moveTo(px, y0); ctx.lineTo(px-12, y0+20); ctx.lineTo(px+12, y0+20); ctx.closePath();
+                        ctx.fillStyle='#cbd5e1'; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#1e293b'; ctx.stroke();
+                        if(n.type === 'roller') {
+                            ctx.beginPath(); ctx.arc(px-6, y0+25, 4, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(px+6, y0+25, 4, 0, Math.PI*2); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(px-18, y0+29); ctx.lineTo(px+18, y0+29); ctx.stroke();
+                        } else {
+                            ctx.beginPath(); ctx.moveTo(px-18, y0+20); ctx.lineTo(px+18, y0+20); ctx.stroke();
+                            for(let i=-18; i<=18; i+=6) { ctx.beginPath(); ctx.moveTo(px+i, y0+20); ctx.lineTo(px+i-4, y0+26); ctx.lineWidth=1; ctx.stroke(); }
+                        }
+                    }
+                });
+
+                // НАВАНТАЖЕННЯ (Малюємо завжди, якщо це не Поверхова схема)
+                let loads = readLoads();
+                loads.forEach(ld => {
+                    if (ld.type === 'P') {
+                        let px = toPx(ld.x); ctx.lineWidth=2.5; ctx.strokeStyle='#dc2626';
+                        ctx.beginPath(); ctx.moveTo(px, y0-50); ctx.lineTo(px, y0); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(px, y0); ctx.lineTo(px-6, y0-12); ctx.lineTo(px+6, y0-12); ctx.fillStyle='#dc2626'; ctx.fill();
+                        ctx.font="bold 13px Arial"; ctx.textAlign="center"; ctx.fillText(`P=${Math.abs(ld.mag)}`, px, y0-55);
+                    }
+                    if (ld.type === 'M') {
+                        let px = toPx(ld.x); ctx.lineWidth=3; ctx.strokeStyle='#f97316';
+                        ctx.beginPath(); ctx.arc(px, y0, 20, Math.PI*1.2, Math.PI*2.8, ld.mag < 0); ctx.stroke();
+                        let aAng = ld.mag < 0 ? Math.PI*1.2 : Math.PI*2.8;
+                        ctx.beginPath(); ctx.arc(px + 20*Math.cos(aAng), y0 + 20*Math.sin(aAng), 5, 0, Math.PI*2); ctx.fillStyle='#f97316'; ctx.fill();
+                        ctx.font="bold 13px Arial"; ctx.textAlign="center"; ctx.fillText(`M=${Math.abs(ld.mag)}`, px, y0-25);
+                    }
+                    if (ld.type === 'q') {
+                        ctx.fillStyle='rgba(16, 185, 129, 0.15)'; ctx.fillRect(toPx(ld.start), y0-30, toPx(ld.end)-toPx(ld.start), 30);
+                        ctx.fillStyle='#059669'; ctx.textAlign="center"; ctx.font="bold 13px Arial";
+                        ctx.fillText(`q=${Math.abs(ld.mag)}`, toPx(ld.start) + (toPx(ld.end)-toPx(ld.start))/2, y0-35);
+                        ctx.strokeStyle='#059669'; ctx.lineWidth=1;
+                        for(let x=toPx(ld.start)+5; x<toPx(ld.end); x+=20) {
+                            ctx.beginPath(); ctx.moveTo(x, y0-30); ctx.lineTo(x, y0); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x-3, y0-6); ctx.lineTo(x+3, y0-6); ctx.fill();
+                        }
+                    }
+                });
+            }
+        }
+
+        // Запуск
+        updateSlidersMax();
+        analyzeSystem();
+    </script>
+</body>
+</html>

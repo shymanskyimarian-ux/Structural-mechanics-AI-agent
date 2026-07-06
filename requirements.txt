@@ -1,0 +1,4 @@
+streamlit>=1.35.0
+ollama>=0.2.1
+docxtpl>=0.16.7
+streamlit-javascript>=0.1.5

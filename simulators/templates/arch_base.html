@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналіз Тришарнірної Арки</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9;}
+        canvas { background-color: #ffffff; cursor: crosshair; }
+        .slider-wrapper { margin-bottom: 0.5rem; }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #3b82f6;}
+        .math-block { background: #0f172a; color: #f8fafc; padding: 1rem; border-radius: 0.5rem; font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; overflow-x: auto; }
+        .diag-active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        .diag-inactive { background-color: white; color: #475569; border-color: #cbd5e1; }
+        .diag-inactive:hover { background-color: #f8fafc; }
+    </style>
+</head>
+<body class="p-2 md:p-4">
+
+    <div class="max-w-[1400px] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col xl:flex-row border border-slate-200">
+        
+        <!-- ПАНЕЛЬ КЕРУВАННЯ -->
+        <div class="w-full xl:w-[450px] p-5 border-r border-slate-200 flex flex-col h-full max-h-[95vh] overflow-y-auto bg-slate-50">
+            
+            <h2 class="text-lg font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-2">Геометрія арки</h2>
+            <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Форма осі арки:</label>
+                    <select id="selArchType" class="w-full p-2 border border-slate-300 rounded text-sm font-semibold">
+                        <option value="parabola" selected>Квадратна парабола</option>
+                        <option value="circle">Дуга кола</option>
+                        <option value="ellipse">Напівеліпс</option>
+                    </select>
+                </div>
+                <div class="slider-wrapper">
+                    <label class="flex justify-between font-bold text-slate-700 text-[11px] mb-1">
+                        <span>Проліт L:</span><span id="valL" class="text-blue-600">10.0 м</span>
+                    </label>
+                    <input type="range" id="sliderL" min="4" max="20" step="0.5" value="10">
+                </div>
+                <div class="slider-wrapper">
+                    <label class="flex justify-between font-bold text-slate-700 text-[11px] mb-1">
+                        <span>Стріла підйому (висота) f:</span><span id="valF" class="text-blue-600">3.0 м</span>
+                    </label>
+                    <input type="range" id="sliderF" min="1" max="10" step="0.5" value="3">
+                </div>
+            </div>
+
+            <h2 class="text-lg font-black text-slate-800 mb-3 uppercase tracking-wide border-b pb-2">Навантаження</h2>
+            
+            <!-- Сила P1 -->
+            <div class="border border-red-200 bg-red-50 p-3 rounded-lg mb-3 shadow-sm">
+                <div class="flex justify-between font-bold text-red-700 text-sm mb-1">
+                    <span>1. Сила P1 (кН)</span><span id="valP1_mag">20</span>
+                </div>
+                <input type="range" id="sliderP1_mag" min="0" max="100" step="1" value="20">
+                <div class="flex justify-between mt-2 text-[10px] text-slate-600 font-bold uppercase">
+                    <span>Позиція по X:</span><span id="valP1_pos">2.5 м</span>
+                </div>
+                <input type="range" id="sliderP1_pos" min="0" max="100" step="1" value="25">
+                <div class="mt-2 text-xs font-semibold text-slate-700 flex gap-4 items-center">
+                    <label><input type="radio" name="p1_dir" value="-1" checked> Зверху вниз ↓</label>
+                    <label><input type="radio" name="p1_dir" value="1"> Знизу вверх ↑</label>
+                </div>
+            </div>
+
+            <!-- Сила P2 -->
+            <div class="border border-orange-200 bg-orange-50 p-3 rounded-lg mb-3 shadow-sm">
+                <div class="flex justify-between font-bold text-orange-700 text-sm mb-1">
+                    <span>2. Сила P2 (кН)</span><span id="valP2_mag">0</span>
+                </div>
+                <input type="range" id="sliderP2_mag" min="0" max="100" step="1" value="0">
+                <div class="flex justify-between mt-2 text-[10px] text-slate-600 font-bold uppercase">
+                    <span>Позиція по X:</span><span id="valP2_pos">7.5 м</span>
+                </div>
+                <input type="range" id="sliderP2_pos" min="0" max="100" step="1" value="75">
+                <div class="mt-2 text-xs font-semibold text-slate-700 flex gap-4 items-center">
+                    <label><input type="radio" name="p2_dir" value="-1" checked> Зверху вниз ↓</label>
+                    <label><input type="radio" name="p2_dir" value="1"> Знизу вверх ↑</label>
+                </div>
+            </div>
+
+            <!-- Розподілене q -->
+            <div class="border border-emerald-200 bg-emerald-50 p-3 rounded-lg mb-4 shadow-sm">
+                <div class="flex justify-between font-bold text-emerald-700 text-sm mb-1">
+                    <span>3. Розподілене q (кН/м) вздовж осі X</span><span id="valQ_mag">5</span>
+                </div>
+                <input type="range" id="sliderQ_mag" min="0" max="50" step="1" value="5">
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mb-1">
+                            <span>Від X:</span><span id="valQ_pos">0.0 м</span>
+                        </div>
+                        <input type="range" id="sliderQ_pos" min="0" max="100" step="1" value="0">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase mb-1">
+                            <span>Довжина:</span><span id="valQ_len">5.0 м</span>
+                        </div>
+                        <input type="range" id="sliderQ_len" min="0" max="100" step="1" value="50">
+                    </div>
+                </div>
+                 <div class="mt-2 text-xs font-semibold text-slate-700 flex gap-4 items-center">
+                    <label><input type="radio" name="q_dir" value="-1" checked> Зверху вниз ↓</label>
+                    <label><input type="radio" name="q_dir" value="1"> Знизу вверх ↑</label>
+                </div>
+            </div>
+
+            <!-- АНАЛІТИКА -->
+            <div class="bg-slate-900 p-4 rounded-lg shadow-inner text-slate-300 font-mono text-[11px] leading-relaxed">
+                <h3 class="font-bold text-yellow-400 mb-2 uppercase border-b border-slate-700 pb-1">Рівновага Системи</h3>
+                <div id="outReactions" class="grid grid-cols-2 gap-x-2 gap-y-1 mb-3 text-white"></div>
+                
+                <h3 class="font-bold text-yellow-400 mb-2 uppercase border-b border-slate-700 pb-1">Перевірка Рівноваги (ΣM=0)</h3>
+                <div id="outEquilibrium"></div>
+            </div>
+        </div>
+
+        <!-- ВІЗУАЛІЗАЦІЯ -->
+        <div class="w-full xl:flex-1 p-4 md:p-6 flex flex-col bg-white">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div>
+                    <h2 id="diagramTitle" class="text-2xl font-black text-slate-800 tracking-tight">Епюра згинальних моментів M</h2>
+                    <p id="diagramDesc" class="text-xs text-slate-500 mt-1 font-medium">
+                        Будується з боку розтягнутих волокон (без знаків).
+                    </p>
+                </div>
+                
+                <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
+                    <button id="btnDiagM" class="px-5 py-2 text-sm font-black rounded diag-active transition-all">M</button>
+                    <button id="btnDiagQ" class="px-5 py-2 text-sm font-black rounded diag-inactive transition-all border">Q</button>
+                    <button id="btnDiagN" class="px-5 py-2 text-sm font-black rounded diag-inactive transition-all border">N</button>
+                </div>
+            </div>
+            
+            <div class="flex-grow border-2 border-slate-200 rounded-xl overflow-hidden relative min-h-[500px] shadow-inner bg-[#fafafa]">
+                <canvas id="archCanvas" class="absolute inset-0 w-full h-full"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('archCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let activeDiagram = 'M';
+        const STEPS = 100;
+
+        // UI Elements
+        const ui = {
+            archType: document.getElementById('selArchType'),
+            L: document.getElementById('sliderL'), F: document.getElementById('sliderF'),
+            P1_mag: document.getElementById('sliderP1_mag'), P1_pos: document.getElementById('sliderP1_pos'),
+            P2_mag: document.getElementById('sliderP2_mag'), P2_pos: document.getElementById('sliderP2_pos'),
+            Q_mag: document.getElementById('sliderQ_mag'), Q_pos: document.getElementById('sliderQ_pos'), Q_len: document.getElementById('sliderQ_len'),
+            p1_dir: document.getElementsByName('p1_dir'), p2_dir: document.getElementsByName('p2_dir'), q_dir: document.getElementsByName('q_dir')
+        };
+        const disp = {
+            L: document.getElementById('valL'), F: document.getElementById('valF'),
+            P1_mag: document.getElementById('valP1_mag'), P1_pos: document.getElementById('valP1_pos'),
+            P2_mag: document.getElementById('valP2_mag'), P2_pos: document.getElementById('valP2_pos'),
+            Q_mag: document.getElementById('valQ_mag'), Q_pos: document.getElementById('valQ_pos'), Q_len: document.getElementById('valQ_len')
+        };
+
+        const btnDiagM = document.getElementById('btnDiagM');
+        const btnDiagQ = document.getElementById('btnDiagQ');
+        const btnDiagN = document.getElementById('btnDiagN');
+
+        function setActiveDiagram(diag, btn) {
+            activeDiagram = diag;
+            [btnDiagM, btnDiagQ, btnDiagN].forEach(b => { b.classList.remove('diag-active'); b.classList.add('diag-inactive'); });
+            btn.classList.remove('diag-inactive'); btn.classList.add('diag-active');
+            
+            const title = document.getElementById('diagramTitle');
+            const desc = document.getElementById('diagramDesc');
+            if(diag === 'M') { title.innerText = 'Епюра згинальних моментів M'; desc.innerText = 'Будується на нормалях з боку розтягнутих волокон (без знаків).'; }
+            if(diag === 'Q') { title.innerText = 'Епюра поперечних зусиль Q'; desc.innerHTML = 'Відкладається з одного боку осі. Має знаки <span class="text-blue-500 font-bold">(+)</span> та <span class="text-red-500 font-bold">(-)</span>.'; }
+            if(diag === 'N') { title.innerText = 'Епюра поздовжніх зусиль N'; desc.innerHTML = 'Відкладається по одну сторону осі. Зазвичай стиск <span class="text-red-500 font-bold">(-)</span>.'; }
+            update();
+        }
+        btnDiagM.addEventListener('click', () => setActiveDiagram('M', btnDiagM));
+        btnDiagQ.addEventListener('click', () => setActiveDiagram('Q', btnDiagQ));
+        btnDiagN.addEventListener('click', () => setActiveDiagram('N', btnDiagN));
+
+        Object.values(ui).forEach(el => {
+            if(el instanceof NodeList) el.forEach(r => r.addEventListener('change', update));
+            else el.addEventListener('input', update);
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            update();
+        });
+
+        function getRadioVal(name) {
+            let radios = document.getElementsByName(name);
+            for (let i = 0; i < radios.length; i++) if (radios[i].checked) return parseFloat(radios[i].value);
+            return -1;
+        }
+
+        // --- МАТЕМАТИКА АРКИ ---
+        function getArchGeometry(type, x, L, f) {
+            let y = 0, dy_dx = 0;
+            if (type === 'parabola') {
+                y = (4 * f / (L * L)) * x * (L - x);
+                dy_dx = (4 * f / (L * L)) * (L - 2 * x);
+            } else if (type === 'circle') {
+                let R = (L*L)/(8*f) + f/2;
+                let y0 = f - R;
+                let term = R*R - Math.pow(x - L/2, 2);
+                if(term < 0) term = 0;
+                y = Math.sqrt(term) + y0;
+                dy_dx = -(x - L/2) / Math.sqrt(term);
+                if(y < 0) { y = 0; dy_dx = 0; }
+            } else if (type === 'ellipse') {
+                let a = L/2, b = f;
+                let term = 1 - Math.pow((x - a)/a, 2);
+                if (term < 0) term = 0;
+                y = b * Math.sqrt(term);
+                if (y > 0.001) dy_dx = - (b*b*(x - a)) / (a*a*y);
+                else dy_dx = (x < L/2) ? 100 : -100; // Вертикальна дотична на краях
+            }
+            let alpha = Math.atan(dy_dx);
+            let sinA = Math.sin(alpha);
+            let cosA = Math.cos(alpha);
+            return { y, alpha, sinA, cosA, nx: -sinA, ny: cosA }; // Нормаль вказує всередину кривини
+        }
+
+        function update() {
+            // Геометрія
+            const type = ui.archType.value;
+            const L = parseFloat(ui.L.value); const f = parseFloat(ui.F.value);
+            disp.L.innerText = L.toFixed(1) + " м"; disp.F.innerText = f.toFixed(1) + " м";
+
+            // Навантаження
+            const P1 = parseFloat(ui.P1_mag.value); const P1x = (parseFloat(ui.P1_pos.value) / 100) * L;
+            const P1dir = getRadioVal('p1_dir');
+            disp.P1_mag.innerText = P1; disp.P1_pos.innerText = P1x.toFixed(2) + " м";
+
+            const P2 = parseFloat(ui.P2_mag.value); const P2x = (parseFloat(ui.P2_pos.value) / 100) * L;
+            const P2dir = getRadioVal('p2_dir');
+            disp.P2_mag.innerText = P2; disp.P2_pos.innerText = P2x.toFixed(2) + " м";
+
+            const Q_mag = parseFloat(ui.Q_mag.value);
+            let q_p_pos = parseFloat(ui.Q_pos.value); let q_p_len = parseFloat(ui.Q_len.value);
+            if(q_p_pos + q_p_len > 100) { q_p_len = 100 - q_p_pos; ui.Q_len.value = q_p_len; }
+            const Q_startX = (q_p_pos / 100) * L; const Q_endX = ((q_p_pos + q_p_len) / 100) * L;
+            const Qdir = getRadioVal('q_dir');
+            disp.Q_mag.innerText = Q_mag; disp.Q_pos.innerText = Q_startX.toFixed(2) + " м"; disp.Q_len.innerText = (Q_endX - Q_startX).toFixed(2) + " м";
+
+            // Вектори сил (fy < 0 це вниз)
+            let loads = [];
+            if (P1 > 0) loads.push({type: 'P', id:1, x: P1x, fy: P1 * P1dir});
+            if (P2 > 0) loads.push({type: 'P', id:2, x: P2x, fy: P2 * P2dir});
+            if (Q_mag > 0) loads.push({type: 'q', start: Q_startX, end: Q_endX, mag: Q_mag, dir: Qdir});
+
+            // --- КРОК 1: Вертикальні реакції (як в еквівалентній балці) ---
+            let sumMb = 0, sumFy = 0;
+            loads.forEach(ld => {
+                if(ld.type === 'P') {
+                    sumMb += ld.fy * (ld.x - L);
+                    sumFy += ld.fy;
+                } else if (ld.type === 'q') {
+                    let len = ld.end - ld.start;
+                    let F_q = ld.mag * len * ld.dir;
+                    let cx = ld.start + len/2;
+                    sumMb += F_q * (cx - L);
+                    sumFy += F_q;
+                }
+            });
+            const Va = sumMb / L; // Момент від Va обертає відносно B проти годинникової (якщо Va вгору)
+            const Vb = -sumFy - Va;
+
+            // --- КРОК 2: Згинальний момент в центрі еквівалентної балки M_C^0 ---
+            let Mc0 = 0; // Рахуємо зліва до L/2
+            Mc0 += Va * (L/2);
+            loads.forEach(ld => {
+                if(ld.type === 'P' && ld.x < L/2) {
+                    Mc0 += ld.fy * (L/2 - ld.x);
+                } else if (ld.type === 'q' && ld.start < L/2) {
+                    let endX = Math.min(ld.end, L/2);
+                    let len = endX - ld.start;
+                    let F_q = ld.mag * len * ld.dir;
+                    let cx = ld.start + len/2;
+                    Mc0 += F_q * (L/2 - cx);
+                }
+            });
+
+            // --- КРОК 3: Горизонтальний розпір H ---
+            const H_reac = Mc0 / f; // Оскільки Mc0 - H*f = 0
+            const Ha = H_reac; // Розпір тисне ззовні всередину (вправо на A)
+            const Hb = H_reac; // Вліво на B
+
+            document.getElementById('outReactions').innerHTML = `
+                <div><span class="text-emerald-400">Va = </span>${Math.abs(Va).toFixed(2)} ${Va>0?'↑':'↓'}</div>
+                <div><span class="text-emerald-400">Vb = </span>${Math.abs(Vb).toFixed(2)} ${Vb>0?'↑':'↓'}</div>
+                <div><span class="text-blue-400">Ha = </span>${Math.abs(Ha).toFixed(2)} →</div>
+                <div><span class="text-blue-400">Hb = </span>${Math.abs(Hb).toFixed(2)} ←</div>
+                <div class="col-span-2 pt-1 mt-1 border-t border-slate-700 text-yellow-300">Розпір H = M_c^0 / f = ${Mc0.toFixed(2)} / ${f.toFixed(2)} = ${Ha.toFixed(2)} кН</div>
+            `;
+
+            // --- КРОК 4: Аналітичні функції M, Q, N ---
+            function getBeamForces(x) {
+                let M0 = Va * x;
+                let Q0 = Va;
+                loads.forEach(ld => {
+                    if(ld.type === 'P' && ld.x < x) {
+                        M0 += ld.fy * (x - ld.x);
+                        Q0 += ld.fy;
+                    } else if (ld.type === 'q' && ld.start < x) {
+                        let endX = Math.min(ld.end, x);
+                        let len = endX - ld.start;
+                        let F_q = ld.mag * len * ld.dir;
+                        let cx = ld.start + len/2;
+                        M0 += F_q * (x - cx);
+                        Q0 += F_q;
+                    }
+                });
+                return {M0, Q0};
+            }
+
+            function getArchForces(x) {
+                let { y, sinA, cosA } = getArchGeometry(type, x, L, f);
+                let { M0, Q0 } = getBeamForces(x);
+                
+                // M = M0 - H*y. Додатний M розтягує нижні волокна.
+                let M = M0 - H_reac * y;
+                // Q = Q0*cos(a) - H*sin(a)*sign. Знак sin(a) змінюється після L/2 (дотична йде вниз)
+                // H_reac стискає арку. В лівій половині H тисне вправо (+x), в правій теж вправо (для лівої відсіченої).
+                let Q = Q0 * cosA - H_reac * sinA;
+                // N = - (Q0*sin(a) + H*cos(a))
+                let N = -(Q0 * sinA + H_reac * cosA);
+                
+                return {M, Q, N, y};
+            }
+
+            // ПЕРЕВІРКА РІВНОВАГИ
+            // Сума сил на всю систему
+            let totalFy = Va + Vb; loads.forEach(ld => { if(ld.type==='P') totalFy+=ld.fy; else totalFy+=ld.mag*(ld.end-ld.start)*ld.dir; });
+            let totalFx = Ha - Hb;
+            
+            // Вузол С зліва і справа
+            let eps = 0.0001;
+            let Mc_left = getArchForces(L/2 - eps).M;
+            let Mc_right = getArchForces(L/2 + eps).M; // В статично визначеній системі має бути 0
+
+            document.getElementById('outEquilibrium').innerHTML = `
+                <div class="flex justify-between"><span>ΣY на систему:</span> <span class="${Math.abs(totalFy)<0.01?'text-emerald-400':'text-red-500'}">${totalFy.toFixed(3)} = 0</span></div>
+                <div class="flex justify-between"><span>ΣX на систему:</span> <span class="${Math.abs(totalFx)<0.01?'text-emerald-400':'text-red-500'}">${totalFx.toFixed(3)} = 0</span></div>
+                <div class="flex justify-between"><span>M у шарнірі С (зліва):</span> <span class="${Math.abs(Mc_left)<0.01?'text-emerald-400':'text-red-500'}">${Mc_left.toFixed(3)}</span></div>
+                <div class="flex justify-between"><span>M у шарнірі С (справа):</span> <span class="${Math.abs(Mc_right)<0.01?'text-emerald-400':'text-red-500'}">${Mc_right.toFixed(3)}</span></div>
+            `;
+
+            draw(type, L, f, Va, Vb, Ha, Hb, loads, getArchForces);
+        }
+
+        function draw(type, L, f, Va, Vb, Ha, Hb, loads, getArchForces) {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padX = 80, padY_top = 100, padY_bot = 80;
+            const w = canvas.width - padX*2; const h = canvas.height - padY_top - padY_bot;
+            
+            const scaleXY = Math.min(w / L, h / Math.max(f, L/4)); // Трохи запасу по висоті
+            const x0 = canvas.width / 2 - (L * scaleXY) / 2;
+            const y0 = canvas.height - padY_bot; // y0 - це вісь абсцис (опори)
+
+            function toPx(x, y) { return { px: x0 + x * scaleXY, py: y0 - y * scaleXY }; }
+
+            // Розрахунок геометрії та епюр
+            let archPts = [];
+            let maxVal = 0.001; // Запобіжник від ділення на 0
+
+            for(let i=0; i<=STEPS; i++) {
+                let x = (i/STEPS) * L;
+                let geo = getArchGeometry(type, x, L, f);
+                let forces = getArchForces(x);
+                let val = activeDiagram === 'M' ? forces.M : (activeDiagram === 'Q' ? forces.Q : forces.N);
+                maxVal = Math.max(maxVal, Math.abs(val));
+                archPts.push({x: x, y: geo.y, nx: geo.nx, ny: geo.ny, val: val, M: forces.M, Q: forces.Q, N: forces.N});
+            }
+
+            const scaleVal = (scaleXY * 1.0) / maxVal; // Масштаб епюри (відліт)
+
+            // --- 1. ВІДМАЛЬОВУВАННЯ ЕПЮРИ ---
+            ctx.lineWidth = 1.5;
+            let epPts = [];
+            for(let i=0; i<=STEPS; i++) {
+                let pt = archPts[i];
+                let pPx = toPx(pt.x, pt.y);
+                let ePx, ePy;
+                
+                // Для M будуємо з боку розтягнутих волокон (без знаків). Додатний M - розтяг нижніх (внутрішніх). Нормаль вказує всередину.
+                // Для Q і N відкладаємо по нормалі зі знаком.
+                if (activeDiagram === 'M') {
+                    // pt.val = M. Якщо M>0 (розтяг низу), відкладаємо по нормалі nx, ny (яка дивиться всередину).
+                    // На Canvas вісь Y йде вниз. 
+                    ePx = pPx.px + pt.val * pt.nx * scaleVal;
+                    ePy = pPx.py - pt.val * pt.ny * scaleVal; // - бо py росте вниз
+                } else if (activeDiagram === 'Q' || activeDiagram === 'N') {
+                    // Відкладаємо з одного боку
+                    ePx = pPx.px + pt.val * pt.nx * scaleVal * 0.7; // Трохи менший масштаб
+                    ePy = pPx.py - pt.val * pt.ny * scaleVal * 0.7;
+                }
+                epPts.push({px: ePx, py: ePy, val: pt.val});
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(toPx(archPts[0].x, archPts[0].y).px, toPx(archPts[0].x, archPts[0].y).py);
+            for(let i=0; i<=STEPS; i++) ctx.lineTo(epPts[i].px, epPts[i].py);
+            ctx.lineTo(toPx(archPts[STEPS].x, archPts[STEPS].y).px, toPx(archPts[STEPS].x, archPts[STEPS].y).py);
+            ctx.closePath();
+
+            ctx.fillStyle = activeDiagram === 'M' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(148, 163, 184, 0.15)'; // Жовтий для M, сірий для інших
+            ctx.fill(); ctx.strokeStyle = '#94a3b8'; ctx.stroke();
+
+            // Штриховка
+            let curSign = 0, signBlocks = [], curBlock = [];
+            for(let i=0; i<=STEPS; i+=3) {
+                let aPx = toPx(archPts[i].x, archPts[i].y);
+                ctx.beginPath(); ctx.moveTo(aPx.px, aPx.py); ctx.lineTo(epPts[i].px, epPts[i].py);
+                
+                let s = epPts[i].val > 0.05 ? 1 : (epPts[i].val < -0.05 ? -1 : 0);
+                if(activeDiagram === 'M') ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)'; // M без знаків
+                else ctx.strokeStyle = s > 0 ? 'rgba(59, 130, 246, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+                ctx.stroke();
+
+                if (s !== curSign && s !== 0) {
+                    if (curBlock.length > 0) signBlocks.push({sign: curSign, pts: curBlock});
+                    curBlock = []; curSign = s;
+                }
+                if (s !== 0) curBlock.push({a: aPx, e: epPts[i]});
+            }
+            if (curBlock.length > 0) signBlocks.push({sign: curSign, pts: curBlock});
+
+            // Знаки для Q і N
+            if (activeDiagram !== 'M') {
+                signBlocks.forEach(blk => {
+                    if (blk.pts.length > 2) {
+                        let pt = blk.pts[Math.floor(blk.pts.length / 2)];
+                        let cx = pt.a.px + (pt.e.px - pt.a.px)/2;
+                        let cy = pt.a.py + (pt.e.py - pt.a.py)/2;
+                        
+                        ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 2*Math.PI); ctx.fillStyle = '#fff'; ctx.fill();
+                        ctx.strokeStyle = blk.sign > 0 ? '#3b82f6' : '#ef4444'; ctx.lineWidth = 1.5; ctx.stroke();
+                        ctx.fillStyle = blk.sign > 0 ? '#3b82f6' : '#ef4444'; ctx.font = "bold 16px Arial";
+                        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(blk.sign > 0 ? "+" : "-", cx, cy + 1);
+                    }
+                });
+            }
+
+            // --- 2. МАЛЮВАННЯ ОСІ АРКИ ---
+            ctx.lineWidth = 4; ctx.strokeStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(toPx(archPts[0].x, archPts[0].y).px, toPx(archPts[0].x, archPts[0].y).py);
+            for(let i=1; i<=STEPS; i++) ctx.lineTo(toPx(archPts[i].x, archPts[i].y).px, toPx(archPts[i].x, archPts[i].y).py);
+            ctx.stroke();
+
+            // Шарнір С
+            let pC = toPx(L/2, f);
+            ctx.beginPath(); ctx.arc(pC.px, pC.py, 6, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.lineWidth = 2.5; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+
+            // Опори A і B (обидві шарнірно-нерухомі)
+            function drawHingeSup(px, py) {
+                ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 14, py + 18); ctx.lineTo(px + 14, py + 18); ctx.closePath();
+                ctx.fillStyle = '#cbd5e1'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(px - 22, py + 18); ctx.lineTo(px + 22, py + 18); ctx.stroke();
+                for(let i=-18; i<=18; i+=6) { ctx.beginPath(); ctx.moveTo(px+i, py+18); ctx.lineTo(px+i-4, py+24); ctx.strokeStyle='#94a3b8'; ctx.stroke(); }
+            }
+            drawHingeSup(toPx(0,0).px, toPx(0,0).py); 
+            drawHingeSup(toPx(L,0).px, toPx(L,0).py);
+
+            // --- 3. НАВАНТАЖЕННЯ ---
+            loads.forEach(ld => {
+                if(ld.type === 'q') {
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)'; ctx.strokeStyle = '#059669'; ctx.lineWidth = 1;
+                    let pxS = toPx(ld.start, 0).px; let pxE = toPx(ld.end, 0).px;
+                    let h_q = 30;
+                    
+                    // Знаходимо найвищу точку арки під навантаженням для малювання лінії q
+                    let maxYa = 0;
+                    for(let x=ld.start; x<=ld.end; x+=0.1) maxYa = Math.max(maxYa, getArchGeometry(type, x, L, f).y);
+                    let qY = toPx(0, maxYa).py - (ld.dir < 0 ? h_q + 10 : -40); // Зсув вгору або вниз
+                    
+                    ctx.beginPath(); ctx.moveTo(pxS, qY); ctx.lineTo(pxE, qY); ctx.stroke();
+                    for(let x = pxS; x <= pxE; x += 20) {
+                        let simX = ld.start + ((x - pxS)/(pxE - pxS)) * (ld.end - ld.start);
+                        let aY = toPx(0, getArchGeometry(type, simX, L, f).y).py;
+                        if(ld.dir < 0) drawArrow(x, qY, x, aY - 5, '#059669', '', 0, 0, 5); // Зверху вниз
+                        else drawArrow(x, qY, x, aY + 5, '#059669', '', 0, 0, 5); // Знизу вверх
+                    }
+                    ctx.fillStyle = '#059669'; ctx.font="bold 13px Arial"; ctx.textAlign="center";
+                    ctx.fillText(`q = ${ld.mag}`, pxS + (pxE-pxS)/2, ld.dir < 0 ? qY - 10 : qY + 15);
+                }
+                if(ld.type === 'P') {
+                    let aY = getArchGeometry(type, ld.x, L, f).y;
+                    let pt = toPx(ld.x, aY);
+                    let ax = pt.px, ay = pt.py, bx = pt.px, by = pt.py;
+                    if(ld.fy < 0) { ay -= 50; by -= 5;} // Вниз
+                    else { ay += 50; by += 5; } // Вверх
+                    drawArrow(ax, ay, bx, by, '#dc2626', `P${ld.id}=${Math.abs(ld.fy)}`, 15, ld.fy<0 ? -20 : 25, 8);
+                }
+            });
+
+            // ВЕКТОРИ РЕАКЦІЙ
+            function rReac(val, px, py, isVert, lbl) {
+                if(Math.abs(val) < 0.01) return;
+                let color = isVert ? '#10b981' : '#3b82f6'; let ax = px, ay = py, bx = px, by = py;
+                if(isVert) { if(val > 0) { ay += 45; by += 15; } else { ay -= 45; by -= 15; } } 
+                else { if(val > 0) { ax -= 45; bx -= 15; } else { ax += 45; bx += 15; } }
+                drawArrow(ax, ay, bx, by, color, `${lbl}=${Math.abs(val).toFixed(1)}`, isVert?15:-25, isVert?20:-15, 7);
+            }
+            rReac(Va, toPx(0,0).px, toPx(0,0).py, true, 'Va'); rReac(Ha, toPx(0,0).px, toPx(0,0).py, false, 'Ha');
+            rReac(Vb, toPx(L,0).px, toPx(L,0).py, true, 'Vb'); rReac(-Hb, toPx(L,0).px, toPx(L,0).py, false, 'Hb'); // Hb діє вліво
+
+            // МАРКЕРИ ЧИСЛОВИХ ЗНАЧЕНЬ (Екстремуми та характерні точки)
+            ctx.fillStyle = '#0f172a'; ctx.font = "bold 11px Arial";
+            [0, STEPS/4, STEPS/2, 3*STEPS/4, STEPS].forEach(i => {
+                let pt = archPts[i];
+                if(Math.abs(pt.val) > 0.05) {
+                    let pPx = toPx(pt.x, pt.y);
+                    let ePx, ePy;
+                    if(activeDiagram === 'M') { ePx = pPx.px + pt.val*pt.nx*scaleVal; ePy = pPx.py - pt.val*pt.ny*scaleVal; }
+                    else { ePx = pPx.px + pt.val*pt.nx*scaleVal*0.7; ePy = pPx.py - pt.val*pt.ny*scaleVal*0.7; }
+                    
+                    ctx.beginPath(); ctx.arc(ePx, ePy, 3, 0, Math.PI*2); ctx.fillStyle = '#1e293b'; ctx.fill();
+                    ctx.textAlign = pt.nx < 0 ? "right" : "left";
+                    ctx.fillText(Math.abs(pt.val).toFixed(1), ePx + (pt.nx < 0 ? -6 : 6), ePy);
+                }
+            });
+            // 0 в замку
+            if(activeDiagram === 'M') ctx.fillText("0", toPx(L/2, f).px, toPx(L/2, f).py + 15);
+        }
+
+        function drawArrow(x1, y1, x2, y2, color, label, txtOx, txtOy, headSize=8) {
+            ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            const a = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath(); ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headSize * Math.cos(a - Math.PI/6), y2 - headSize * Math.sin(a - Math.PI/6));
+            ctx.lineTo(x2 - headSize * Math.cos(a + Math.PI/6), y2 - headSize * Math.sin(a + Math.PI/6));
+            ctx.closePath(); ctx.fill();
+            if(label) { ctx.font = "bold 13px Arial"; ctx.textAlign="left"; ctx.textBaseline="alphabetic"; ctx.fillText(label, x1 + txtOx, y1 + txtOy); }
+        }
+
+        setTimeout(update, 100);
+    </script>
+</body>
+</html>

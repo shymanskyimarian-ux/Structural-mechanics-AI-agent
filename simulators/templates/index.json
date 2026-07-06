@@ -1,0 +1,56 @@
+{
+  "templates": [
+    {
+      "file": "beam_gerber.html",
+      "report": "report_beam.docx",
+      "type": "beam",
+      "title": "Багатопрогінна шарнірно-консольна балка (балка Гербера)",
+      "keywords": [
+        "балка", "гербера", "шарнірна", "багатопрогінна", "консольна",
+        "поверхова схема", "лінії впливу", "підвісна балка", "проміжний шарнір"
+      ],
+      "canvas_id": "beamCanvas",
+      "diagram_tab_button": "btnDiagM",
+      "builtin": true
+    },
+    {
+      "file": "truss_sprengel.html",
+      "report": "report_truss.docx",
+      "type": "truss",
+      "title": "Шпренгельна ферма",
+      "keywords": [
+        "ферма", "шпренгель", "стрижні", "вузли", "переріз",
+        "вирізання вузлів", "метод перерізів", "розтяг", "стиск"
+      ],
+      "canvas_id": "trussCanvas",
+      "diagram_tab_button": null,
+      "builtin": true
+    },
+    {
+      "file": "arch_base.html",
+      "report": "report_arch.docx",
+      "type": "arch",
+      "title": "Тришарнірна арка",
+      "keywords": [
+        "арка", "тришарнірна", "розпір", "замковий шарнір",
+        "стріла підйому", "розпір арки", "вісь арки"
+      ],
+      "canvas_id": "archCanvas",
+      "diagram_tab_button": "btnDiagM",
+      "builtin": true
+    },
+    {
+      "file": "frame_base.html",
+      "report": "report_frame.docx",
+      "type": "frame",
+      "title": "Статично визначена рама",
+      "keywords": [
+        "рама", "затяжка", "переміщення", "формула мора", "верещагін",
+        "стійка", "ригель", "епюра m", "епюра q", "епюра n"
+      ],
+      "canvas_id": "frameCanvas",
+      "diagram_tab_button": "btnDiagM",
+      "builtin": true
+    }
+  ]
+}

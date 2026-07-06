@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Універсальний Розрахунок П-подібної Рами + Gemini AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        canvas { background-color: #f8fafc; cursor: crosshair; }
+        .slider-wrapper { margin-bottom: 0.5rem; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .math-block { background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 0.5rem; font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; overflow-x: auto; }
+        .load-card { transition: all 0.2s; }
+        .load-off { opacity: 0.6; filter: grayscale(100%); }
+        .ai-text strong { color: #f59e0b; }
+        .ai-text ul { list-style-type: disc; margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .ai-text p { margin-bottom: 0.5rem; }
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 3px solid #3b82f6; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .tab-btn-diag { transition: all 0.2s ease-in-out; }
+        .diag-active { background-color: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3); }
+        .diag-inactive { background-color: white; color: #475569; border-color: #e2e8f0; }
+        .diag-inactive:hover { background-color: #f1f5f9; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-2 md:p-6">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- Панель керування та логіки -->
+        <div class="w-full md:w-5/12 p-5 border-r border-gray-200 flex flex-col h-full max-h-[95vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">Геометрія рами</h2>
+            
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="slider-wrapper">
+                    <label class="flex justify-between font-semibold text-gray-700 text-[11px] mb-1">
+                        <span>Проліт L:</span><span id="valL" class="text-blue-600">6.0</span>
+                    </label>
+                    <input type="range" id="sliderL" min="4" max="12" step="0.5" value="6">
+                </div>
+                <div class="slider-wrapper">
+                    <label class="flex justify-between font-semibold text-gray-700 text-[11px] mb-1">
+                        <span>Висота H:</span><span id="valH" class="text-blue-600">4.0</span>
+                    </label>
+                    <input type="range" id="sliderH" min="2" max="8" step="0.5" value="4">
+                </div>
+                <div class="slider-wrapper bg-blue-50 p-1 rounded border border-blue-100">
+                    <label class="flex justify-between font-bold text-blue-800 text-[11px] mb-1">
+                        <span>Консоль Lc:</span><span id="valLc" class="text-blue-600">2.0</span>
+                    </label>
+                    <input type="range" id="sliderLc" min="0" max="6" step="0.5" value="2.0">
+                </div>
+            </div>
+
+            <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Навантаження</h2>
+            
+            <!-- Навантаження 1: Сила P -->
+            <div id="cardP" class="border border-red-200 bg-red-50 p-3 rounded-lg mb-3 load-card">
+                <div class="flex justify-between font-bold text-red-700 text-sm mb-1">
+                    <span>1. Зосереджена сила P (кН)</span><span id="valP_mag">10</span>
+                </div>
+                <input type="range" id="sliderP_mag" min="0" max="30" step="1" value="10">
+                <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                    <select id="selP_elem" class="p-1.5 rounded border border-red-200 bg-white">
+                        <option value="colL">Ліва стійка</option>
+                        <option value="beam" selected>Ригель</option>
+                        <option value="cant">Консоль</option>
+                        <option value="colR">Права стійка</option>
+                    </select>
+                    <select id="selP_dir" class="p-1.5 rounded border border-red-200 bg-white">
+                        <option value="V" selected>Вертикально ↓</option>
+                        <option value="H">Горизонтально →</option>
+                    </select>
+                </div>
+                <div class="flex justify-between mt-2 text-[11px] text-gray-600 font-semibold">
+                    <span>Позиція від початку ел-та:</span><span id="valP_pos">100%</span>
+                </div>
+                <input type="range" id="sliderP_pos" min="0" max="100" step="1" value="100">
+            </div>
+
+            <!-- Навантаження 2: Момент M -->
+            <div id="cardM" class="border border-orange-200 bg-orange-50 p-3 rounded-lg mb-3 load-card load-off">
+                <div class="flex justify-between font-bold text-orange-700 text-sm mb-1">
+                    <span>2. Момент M (кН·м)</span><span id="valM_mag">0</span>
+                </div>
+                <input type="range" id="sliderM_mag" min="-30" max="30" step="1" value="0">
+                <div class="text-[10px] text-orange-600 mb-2 font-bold"><span class="text-red-500">(-) за годинниковою</span>, <span class="text-blue-500">(+) проти</span></div>
+                <select id="selM_elem" class="w-full p-1.5 rounded border border-orange-200 bg-white text-xs mb-2">
+                    <option value="colL">Ліва стійка</option>
+                    <option value="beam">Ригель</option>
+                    <option value="cant" selected>Консоль</option>
+                    <option value="colR">Права стійка</option>
+                </select>
+                <div class="flex justify-between text-[11px] text-gray-600 font-semibold">
+                    <span>Позиція:</span><span id="valM_pos">50%</span>
+                </div>
+                <input type="range" id="sliderM_pos" min="0" max="100" step="1" value="50">
+            </div>
+
+            <!-- Навантаження 3: Розподілене q -->
+            <div id="cardQ" class="border border-green-200 bg-green-50 p-3 rounded-lg mb-4 load-card load-off">
+                <div class="flex justify-between font-bold text-green-700 text-sm mb-1">
+                    <span>3. Розподілене q (кН/м)</span><span id="valQ_mag">0</span>
+                </div>
+                <input type="range" id="sliderQ_mag" min="0" max="20" step="1" value="0">
+                <div class="text-[10px] text-green-600 mb-2">Навантаження діє перпендикулярно всередину</div>
+                <select id="selQ_elem" class="w-full p-1.5 rounded border border-green-200 bg-white text-xs">
+                    <option value="colL">Ліва стійка</option>
+                    <option value="beam" selected>Ригель</option>
+                    <option value="cant">Консоль</option>
+                    <option value="colR">Права стійка</option>
+                </select>
+                
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <div class="flex justify-between text-[11px] text-gray-600 font-semibold mb-1">
+                            <span>Позиція:</span><span id="valQ_pos">0%</span>
+                        </div>
+                        <input type="range" id="sliderQ_pos" min="0" max="100" step="1" value="0">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[11px] text-gray-600 font-semibold mb-1">
+                            <span>Довжина:</span><span id="valQ_len">100%</span>
+                        </div>
+                        <input type="range" id="sliderQ_len" min="0" max="100" step="1" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- СИСТЕМА ВКЛАДОК -->
+            <div class="flex border-b border-gray-200 mb-3">
+                <button id="tabLogBtn" class="flex-1 py-2 text-[11px] font-bold text-center border-b-2 border-blue-600 text-blue-600 focus:outline-none">
+                    Рівновага
+                </button>
+                <button id="tabSectionsBtn" class="flex-1 py-2 text-[11px] font-bold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 focus:outline-none">
+                    Перерізи
+                </button>
+                <button id="tabAiBtn" class="flex-1 py-2 text-[11px] font-bold text-center border-b-2 border-transparent text-purple-600 hover:text-purple-800 focus:outline-none">
+                    AI Експерт ✨
+                </button>
+            </div>
+
+            <div id="logContent" class="space-y-1 mb-4">
+                <div id="mathOutput" class="math-block max-h-[250px] overflow-y-auto"></div>
+            </div>
+            
+            <div id="sectionsContent" class="hidden space-y-1 mb-4">
+                <div id="characteristicTable" class="bg-slate-900 text-white rounded-lg p-3 text-xs font-mono max-h-[250px] overflow-y-auto space-y-1"></div>
+            </div>
+
+            <div id="aiContent" class="hidden flex-col h-[250px] bg-slate-900 rounded-lg p-4 relative overflow-hidden">
+                <div class="text-white text-xs mb-3">
+                    <b>Gemini AI</b> проаналізує поточну розрахункову схему.
+                </div>
+                <button id="btnAskGemini" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all flex justify-center items-center text-sm">
+                    <span>✨ Проаналізувати</span>
+                </button>
+                <div id="aiResultContainer" class="hidden flex-col flex-grow mt-3 h-full overflow-hidden">
+                    <div id="aiResultText" class="text-gray-300 text-[11px] overflow-y-auto flex-grow bg-slate-800 p-2 rounded border border-slate-700 ai-text"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Полотно (Canvas) для епюр -->
+        <div class="w-full md:w-7/12 p-6 flex flex-col">
+            
+            <!-- ПЕРЕМИКАЧ ЕПЮР -->
+            <div class="flex justify-center space-x-2 mb-4 bg-gray-100 p-2 rounded-lg border border-gray-200 w-max mx-auto">
+                <button id="btnDiagM" class="px-5 py-2 text-xs font-bold rounded-md tab-btn-diag diag-active">Епюра (M)</button>
+                <button id="btnDiagQ" class="px-5 py-2 text-xs font-bold rounded-md tab-btn-diag diag-inactive border">Епюра (Q)</button>
+                <button id="btnDiagN" class="px-5 py-2 text-xs font-bold rounded-md tab-btn-diag diag-inactive border">Епюра (N)</button>
+            </div>
+
+            <div>
+                <h2 id="diagramTitle" class="text-xl font-bold text-gray-800 mb-1">Епюра згинальних моментів M(x)</h2>
+                <p id="diagramDesc" class="text-xs text-gray-600 mb-3">
+                    Епюра будується суворо <b>з боку розтягнутих волокон</b> конструкції.<br>
+                    <span class="inline-block w-3 h-3 bg-red-100 border border-red-400 rounded mr-1"></span> Червона зона — розтягнуті <b>зовнішні/верхні</b> волокна.<br>
+                    <span class="inline-block w-3 h-3 bg-blue-100 border border-blue-400 rounded mr-1"></span> Синя зона — розтягнуті <b>внутрішні/нижні</b> волокна.
+                </p>
+            </div>
+            
+            <div class="flex-grow border-2 border-dashed border-gray-300 rounded-lg overflow-hidden relative min-h-[500px]">
+                <canvas id="frameCanvas" class="absolute inset-0 w-full h-full"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('frameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Глобальна змінна для вибору поточної епюри (M, Q, N)
+        let activeDiagram = 'M';
+
+        // Елементи UI
+        const ui = {
+            L: document.getElementById('sliderL'), H: document.getElementById('sliderH'), Lc: document.getElementById('sliderLc'),
+            P_mag: document.getElementById('sliderP_mag'), P_elem: document.getElementById('selP_elem'), P_dir: document.getElementById('selP_dir'), P_pos: document.getElementById('sliderP_pos'),
+            M_mag: document.getElementById('sliderM_mag'), M_elem: document.getElementById('selM_elem'), M_pos: document.getElementById('sliderM_pos'),
+            Q_mag: document.getElementById('sliderQ_mag'), Q_elem: document.getElementById('selQ_elem'), Q_pos: document.getElementById('sliderQ_pos'), Q_len: document.getElementById('sliderQ_len')
+        };
+        const displays = {
+            L: document.getElementById('valL'), H: document.getElementById('valH'), Lc: document.getElementById('valLc'),
+            P_mag: document.getElementById('valP_mag'), P_pos: document.getElementById('valP_pos'),
+            M_mag: document.getElementById('valM_mag'), M_pos: document.getElementById('valM_pos'),
+            Q_mag: document.getElementById('valQ_mag'), Q_pos: document.getElementById('valQ_pos'), Q_len: document.getElementById('valQ_len')
+        };
+
+        const tabLogBtn = document.getElementById('tabLogBtn');
+        const tabSectionsBtn = document.getElementById('tabSectionsBtn');
+        const tabAiBtn = document.getElementById('tabAiBtn');
+        const logContent = document.getElementById('logContent');
+        const sectionsContent = document.getElementById('sectionsContent');
+        const aiContent = document.getElementById('aiContent');
+
+        function switchTab(activeBtn, activeContent) {
+            [tabLogBtn, tabSectionsBtn, tabAiBtn].forEach(btn => {
+                btn.classList.remove('border-blue-600', 'text-blue-600', 'border-purple-600', 'text-purple-600');
+                btn.classList.add('border-transparent');
+                if(btn === tabAiBtn) btn.classList.add('text-purple-600');
+                else btn.classList.add('text-gray-500');
+            });
+
+            if(activeBtn === tabAiBtn) {
+                activeBtn.classList.remove('border-transparent', 'text-purple-600');
+                activeBtn.classList.add('border-purple-600', 'text-purple-600');
+            } else {
+                activeBtn.classList.add('border-blue-600', 'text-blue-600');
+                activeBtn.classList.remove('border-transparent', 'text-gray-500');
+            }
+
+            logContent.classList.add('hidden');
+            sectionsContent.classList.add('hidden');
+            aiContent.classList.add('hidden');
+            activeContent.classList.remove('hidden');
+            activeContent.classList.add('flex');
+        }
+
+        tabLogBtn.addEventListener('click', () => switchTab(tabLogBtn, logContent));
+        tabSectionsBtn.addEventListener('click', () => switchTab(tabSectionsBtn, sectionsContent));
+        tabAiBtn.addEventListener('click', () => switchTab(tabAiBtn, aiContent));
+
+        // Обробка кнопок перемикання епюр
+        const btnDiagM = document.getElementById('btnDiagM');
+        const btnDiagQ = document.getElementById('btnDiagQ');
+        const btnDiagN = document.getElementById('btnDiagN');
+
+        function setActiveDiagram(diag, btn) {
+            activeDiagram = diag;
+            [btnDiagM, btnDiagQ, btnDiagN].forEach(b => {
+                b.classList.remove('diag-active');
+                b.classList.add('diag-inactive');
+            });
+            btn.classList.remove('diag-inactive');
+            btn.classList.add('diag-active');
+
+            const title = document.getElementById('diagramTitle');
+            const desc = document.getElementById('diagramDesc');
+            
+            if (diag === 'M') {
+                title.innerText = 'Епюра згинальних моментів M(x)';
+                desc.innerHTML = 'Епюра будується суворо <b>з боку розтягнутих волокон</b> конструкції.<br><span class="inline-block w-3 h-3 bg-red-100 border border-red-400 rounded mr-1"></span> Червона зона — розтягнуті <b>зовнішні/верхні</b> волокна.<br><span class="inline-block w-3 h-3 bg-blue-100 border border-blue-400 rounded mr-1"></span> Синя зона — розтягнуті <b>внутрішні/нижні</b> волокна.';
+            } else if (diag === 'Q') {
+                title.innerText = 'Епюра поперечних зусиль Q(x)';
+                desc.innerHTML = 'Відображає зрізуючі зусилля. На епюрі обов\'язково <b>вказуються знаки</b> (+) та (-).<br><span class="inline-block w-3 h-3 bg-blue-100 border border-blue-400 rounded mr-1"></span> Синя зона — додатне зусилля (+).<br><span class="inline-block w-3 h-3 bg-red-100 border border-red-400 rounded mr-1"></span> Червона зона — від\'ємне зусилля (-).';
+            } else if (diag === 'N') {
+                title.innerText = 'Епюра поздовжніх зусиль N(x)';
+                desc.innerHTML = 'Відкладається <b>симетрично з двох сторін</b> стрижня. Вказуються знаки стиску/розтягу.<br><span class="inline-block w-3 h-3 bg-blue-100 border border-blue-400 rounded mr-1"></span> Розтяг (+) — додатне зусилля.<br><span class="inline-block w-3 h-3 bg-red-100 border border-red-400 rounded mr-1"></span> Стиск (-) — від\'ємне зусилля.';
+            }
+            update();
+        }
+
+        btnDiagM.addEventListener('click', () => setActiveDiagram('M', btnDiagM));
+        btnDiagQ.addEventListener('click', () => setActiveDiagram('Q', btnDiagQ));
+        btnDiagN.addEventListener('click', () => setActiveDiagram('N', btnDiagN));
+
+        Object.values(ui).forEach(el => {
+            el.addEventListener('input', update);
+            if (el.tagName === 'SELECT') el.addEventListener('change', update);
+        });
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            update();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        let currentState = {};
+
+        function getPos(elem, p, L, H, Lc) {
+            if (elem === 'colL') return {x: 0, y: p * H};
+            if (elem === 'beam') return {x: p * L, y: H};
+            if (elem === 'cant') return {x: L + p * Lc, y: H};
+            if (elem === 'colR') return {x: L, y: (1 - p) * H}; 
+        }
+
+        function update() {
+            const L = parseFloat(ui.L.value);
+            const H = parseFloat(ui.H.value);
+            const Lc = parseFloat(ui.Lc.value);
+            displays.L.innerText = L.toFixed(1); displays.H.innerText = H.toFixed(1); displays.Lc.innerText = Lc.toFixed(1);
+
+            const P_mag = parseFloat(ui.P_mag.value);
+            displays.P_mag.innerText = P_mag === 0 ? "0 (Вимкнено)" : P_mag;
+            displays.P_pos.innerText = ui.P_pos.value + "%";
+            document.getElementById('cardP').className = P_mag === 0 ? "border border-gray-200 bg-gray-50 p-3 rounded-lg mb-3 load-card load-off" : "border border-red-200 bg-red-50 p-3 rounded-lg mb-3 load-card";
+
+            const M_mag = parseFloat(ui.M_mag.value);
+            displays.M_mag.innerText = M_mag === 0 ? "0 (Вимкнено)" : M_mag;
+            displays.M_pos.innerText = ui.M_pos.value + "%";
+            document.getElementById('cardM').className = M_mag === 0 ? "border border-gray-200 bg-gray-50 p-3 rounded-lg mb-3 load-card load-off" : "border border-orange-200 bg-orange-50 p-3 rounded-lg mb-3 load-card";
+
+            const Q_mag = parseFloat(ui.Q_mag.value);
+            let q_p_start = parseFloat(ui.Q_pos.value);
+            let q_p_len = parseFloat(ui.Q_len.value);
+            if (q_p_start + q_p_len > 100) { q_p_len = 100 - q_p_start; ui.Q_len.value = q_p_len; }
+            displays.Q_mag.innerText = Q_mag === 0 ? "0 (Вимкнено)" : Q_mag;
+            displays.Q_pos.innerText = q_p_start + "%";
+            displays.Q_len.innerText = q_p_len + "%";
+            document.getElementById('cardQ').className = Q_mag === 0 ? "border border-gray-200 bg-gray-50 p-3 rounded-lg mb-4 load-card load-off" : "border border-green-200 bg-green-50 p-3 rounded-lg mb-4 load-card";
+
+            let loads = []; 
+
+            if (P_mag > 0) {
+                let p = parseFloat(ui.P_pos.value) / 100;
+                let pos = getPos(ui.P_elem.value, p, L, H, Lc);
+                let fx = 0, fy = 0;
+                if (ui.P_dir.value === 'V') fy = -P_mag; else fx = P_mag; 
+                loads.push({ type: 'P', name: 'Сила P', elem: ui.P_elem.value, p: p, x: pos.x, y: pos.y, fx: fx, fy: fy, m: 0 });
+            }
+
+            if (Math.abs(M_mag) > 0) {
+                let p = parseFloat(ui.M_pos.value) / 100;
+                let pos = getPos(ui.M_elem.value, p, L, H, Lc);
+                loads.push({ type: 'M', name: 'Момент M', elem: ui.M_elem.value, p: p, x: pos.x, y: pos.y, fx: 0, fy: 0, m: M_mag });
+            }
+
+            if (Q_mag > 0 && q_p_len > 0) {
+                let N_q = 100; 
+                let start_p = q_p_start / 100;
+                let len_p = q_p_len / 100;
+                let end_p = start_p + len_p;
+                
+                loads.push({ type: 'q_meta', name: 'Розподілене q', elem: ui.Q_elem.value, start: start_p, len: len_p, end: end_p, mag: Q_mag });
+
+                let elem_len = (ui.Q_elem.value === 'beam') ? L : (ui.Q_elem.value === 'cant' ? Lc : H);
+                let dq = (len_p * elem_len) / N_q;
+
+                for (let i = 0; i < N_q; i++) {
+                    let p_part = start_p + (i + 0.5) * (len_p / N_q);
+                    let pos = getPos(ui.Q_elem.value, p_part, L, H, Lc);
+                    let fx = 0, fy = 0;
+                    if (ui.Q_elem.value === 'colL') fx = Q_mag * dq; 
+                    else if (ui.Q_elem.value === 'beam' || ui.Q_elem.value === 'cant') fy = -Q_mag * dq; 
+                    else if (ui.Q_elem.value === 'colR') fx = -Q_mag * dq; 
+                    loads.push({ type: 'q_part', elem: ui.Q_elem.value, x: pos.x, y: pos.y, fx: fx, fy: fy, m: 0 });
+                }
+            }
+
+            // ГЛОБАЛЬНА РІВНОВАГА
+            let sumFx = 0, sumFy = 0, sumMb = 0, sumMc_left = 0;
+
+            loads.forEach(ld => {
+                if (ld.type === 'q_meta') return;
+                sumFx += ld.fx;
+                sumFy += ld.fy;
+                sumMb += (ld.x - L) * ld.fy - (ld.y - 0) * ld.fx + ld.m;
+                
+                if (ld.elem === 'colL' || (ld.elem === 'beam' && ld.x <= L/2 + 1e-6)) {
+                    sumMc_left += (ld.x - L/2) * ld.fy - (ld.y - H) * ld.fx + ld.m;
+                }
+            });
+
+            const R_Ay = sumMb / L;
+            const R_By = -sumFy - R_Ay;
+            const R_Ax = (R_Ay * (L / 2) - sumMc_left) / H;
+            const R_Bx = -sumFx - R_Ax;
+
+            document.getElementById('mathOutput').innerHTML = `
+                <div>ΣM_B = 0 ➔ <b>Va</b> = ${R_Ay.toFixed(2)} кН</div>
+                <div>ΣF_y = 0 ➔ <b>Vb</b> = ${R_By.toFixed(2)} кН</div>
+                <div class="text-[10px] text-gray-400 mt-2">Ріжемо по шарніру С (ліва відсічена частина):</div>
+                <div class="text-yellow-300">ΣM_C(лів) = -Va·(L/2) + Ha·H + ΣM_ext = 0</div>
+                <div>➔ <b>Ha</b> = (Va·L/2 - ΣM_ext) / H = ${R_Ax.toFixed(2)} кН</div>
+                <div>ΣF_x = 0 ➔ <b>Hb</b> = ${R_Bx.toFixed(2)} кН</div>
+            `;
+
+            // АНАЛІТИЧНІ ФУНКЦІЇ (M, Q, N)
+            function getM(elem, xc, yc) {
+                if (elem === 'colL') {
+                    let sum = (0 - xc) * R_Ay - (0 - yc) * R_Ax;
+                    loads.forEach(ld => {
+                        if (ld.type === 'q_meta') return;
+                        if (ld.elem === 'colL' && ld.y < yc) sum += (ld.x - xc) * ld.fy - (ld.y - yc) * ld.fx + ld.m;
+                    });
+                    return -sum; 
+                }
+                if (elem === 'beam') {
+                    let sum = (0 - xc) * R_Ay - (0 - H) * R_Ax;
+                    loads.forEach(ld => {
+                        if (ld.type === 'q_meta') return;
+                        if (ld.elem === 'colL') sum += (ld.x - xc) * ld.fy - (ld.y - H) * ld.fx + ld.m;
+                        if (ld.elem === 'beam' && ld.x < xc) sum += (ld.x - xc) * ld.fy - (ld.y - H) * ld.fx + ld.m;
+                    });
+                    return -sum;
+                }
+                if (elem === 'cant') {
+                    let sum = 0;
+                    loads.forEach(ld => {
+                        if (ld.type === 'q_meta') return;
+                        if (ld.elem === 'cant' && ld.x > xc) sum += (ld.x - xc) * ld.fy - (ld.y - H) * ld.fx + ld.m;
+                    });
+                    return sum; 
+                }
+                if (elem === 'colR') {
+                    let sum = (L - xc) * R_By - (0 - yc) * R_Bx;
+                    loads.forEach(ld => {
+                        if (ld.type === 'q_meta') return;
+                        if (ld.elem === 'colR' && ld.y < yc) sum += (ld.x - xc) * ld.fy - (ld.y - yc) * ld.fx + ld.m;
+                    });
+                    return -sum;
+                }
+                return 0;
+            }
+
+            function getQ(elem, xc, yc) {
+                if (elem === 'colL') {
+                    let sum_Fx = R_Ax;
+                    loads.forEach(ld => { if(ld.type !== 'q_meta' && ld.elem === 'colL' && ld.y < yc) sum_Fx += ld.fx; });
+                    return -sum_Fx;
+                }
+                if (elem === 'beam') {
+                    let sum_Fy = R_Ay;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta') {
+                            if(ld.elem === 'colL') sum_Fy += ld.fy;
+                            if(ld.elem === 'beam' && ld.x < xc) sum_Fy += ld.fy;
+                        }
+                    });
+                    return sum_Fy;
+                }
+                if (elem === 'cant') {
+                    let sum_Fy = 0;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta' && ld.elem === 'cant' && ld.x > xc) sum_Fy += ld.fy;
+                    });
+                    return -sum_Fy; // Сила вниз (від'ємна fy) обертає консоль за годинниковою -> позитивне Q
+                }
+                if (elem === 'colR') {
+                    let sum_Fx = R_Bx;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta' && ld.elem === 'colR' && ld.y < yc) sum_Fx += ld.fx;
+                    });
+                    return -sum_Fx;
+                }
+                return 0;
+            }
+
+            function getN(elem, xc, yc) {
+                if (elem === 'colL') {
+                    let sum_Fy = R_Ay;
+                    loads.forEach(ld => { if(ld.type !== 'q_meta' && ld.elem === 'colL' && ld.y < yc) sum_Fy += ld.fy; });
+                    return -sum_Fy; // Сила вгору (додатна fy) стискає нижній переріз
+                }
+                if (elem === 'beam') {
+                    let sum_Fx = R_Ax;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta') {
+                            if(ld.elem === 'colL') sum_Fx += ld.fx;
+                            if(ld.elem === 'beam' && ld.x < xc) sum_Fx += ld.fx;
+                        }
+                    });
+                    return -sum_Fx;
+                }
+                if (elem === 'cant') {
+                    let sum_Fx = 0;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta' && ld.elem === 'cant' && ld.x > xc) sum_Fx += ld.fx;
+                    });
+                    return sum_Fx; // Сила вправо (додатна fx) розтягує лівий переріз
+                }
+                if (elem === 'colR') {
+                    let sum_Fy = R_By;
+                    loads.forEach(ld => {
+                        if(ld.type !== 'q_meta' && ld.elem === 'colR' && ld.y < yc) sum_Fy += ld.fy;
+                    });
+                    return -sum_Fy;
+                }
+                return 0;
+            }
+
+            // Функція-роутер для поточної епюри
+            function getActiveVal(elem, xc, yc) {
+                if (activeDiagram === 'M') return getM(elem, xc, yc);
+                if (activeDiagram === 'Q') return getQ(elem, xc, yc);
+                if (activeDiagram === 'N') return getN(elem, xc, yc);
+                return 0;
+            }
+
+            // ХАРАКТЕРНІ ТОЧКИ
+            let renderPoints = [];
+            renderPoints.push({ elem: 'colL', p: 0, label: "Опора А" });
+            renderPoints.push({ elem: 'colL', p: 1, label: "Лівий кут (стійка)" });
+            renderPoints.push({ elem: 'beam', p: 0, label: "Лівий кут (ригель)" });
+            renderPoints.push({ elem: 'beam', p: 0.5, label: "Шарнір С" });
+            renderPoints.push({ elem: 'beam', p: 1, label: "Правий вузол (ригель)" });
+            if (Lc > 0) {
+                renderPoints.push({ elem: 'cant', p: 0, label: "Правий вузол (консоль)" });
+                renderPoints.push({ elem: 'cant', p: 1, label: "Кінець консолі" });
+            }
+            renderPoints.push({ elem: 'colR', p: 0, label: "Правий вузол (стійка)" });
+            renderPoints.push({ elem: 'colR', p: 1, label: "Опора В" });
+
+            loads.filter(ld => ld.type === 'P' || ld.type === 'M').forEach(ld => {
+                if(ld.elem === 'cant' && Lc === 0) return;
+                renderPoints.push({ elem: ld.elem, p: ld.p, label: ld.name });
+            });
+
+            loads.filter(ld => ld.type === 'q_meta').forEach(ld => {
+                if(ld.elem === 'cant' && Lc === 0) return;
+                renderPoints.push({ elem: ld.elem, p: ld.start, label: "q (поч)" });
+                renderPoints.push({ elem: ld.elem, p: ld.start + ld.len/2, label: "q (сер)" });
+                renderPoints.push({ elem: ld.elem, p: ld.end, label: "q (кін)" });
+            });
+
+            let charHtml = ``;
+            let absMaxM = 0;
+
+            renderPoints.forEach(pt => {
+                let pos = getPos(pt.elem, pt.p, L, H, Lc);
+                let val = getActiveVal(pt.elem, pos.x, pos.y);
+                if (Math.abs(val) > absMaxM) absMaxM = Math.abs(val);
+
+                let sideStr = "";
+                if (Math.abs(val) > 0.01) {
+                    if (activeDiagram === 'M') sideStr = val < 0 ? " (назовні)" : " (всередину)";
+                    if (activeDiagram === 'Q' || activeDiagram === 'N') sideStr = val > 0 ? " (+)" : " (-)";
+                }
+
+                let colorClass = Math.abs(val) < 0.01 ? "text-green-300" : (val > 0 ? "text-blue-400" : "text-red-400");
+                if (activeDiagram === 'M') colorClass = Math.abs(val) < 0.01 ? "text-green-300" : "text-yellow-400"; // Для M зберігаємо жовтий для логів
+
+                charHtml += `<div class="flex justify-between border-b border-slate-700 py-1"><span class="text-yellow-200">⮞ ${pt.label}:</span> <span class="${colorClass}">${Math.abs(val).toFixed(2)}${sideStr}</span></div>`;
+            });
+            document.getElementById('characteristicTable').innerHTML = charHtml;
+
+            currentState = {
+                L: L, H: H, Lc: Lc,
+                P: P_mag > 0 ? `${P_mag} кН на ${ui.P_elem.options[ui.P_elem.selectedIndex].text} (${ui.P_dir.value === 'V'?'Вниз':'Вправо'}, поз ${ui.P_pos.value}%)` : 'Немає',
+                M: M_mag !== 0 ? `${M_mag} кН·м на ${ui.M_elem.options[ui.M_elem.selectedIndex].text} (поз ${ui.M_pos.value}%)` : 'Немає',
+                Q: Q_mag > 0 ? `${Q_mag} кН/м на ${ui.Q_elem.options[ui.Q_elem.selectedIndex].text} (довжина ${ui.Q_len.value}%)` : 'Немає',
+                Va: R_Ay.toFixed(2), Vb: R_By.toFixed(2), Ha: R_Ax.toFixed(2), Hb: R_Bx.toFixed(2),
+                maxM: absMaxM.toFixed(2)
+            };
+
+            draw(L, H, Lc, R_Ax, R_Ay, R_Bx, R_By, getActiveVal, loads, P_mag, M_mag, Q_mag, renderPoints);
+        }
+
+        // --- GEMINI API INTEGRATION ---
+        const btnAskGemini = document.getElementById('btnAskGemini');
+        const aiResultContainer = document.getElementById('aiResultContainer');
+        const aiResultText = document.getElementById('aiResultText');
+
+        async function fetchWithRetry(url, options, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        btnAskGemini.addEventListener('click', async () => {
+            const apiKey = "";
+            const model = "gemini-2.5-flash-preview-09-2025";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+            btnAskGemini.innerHTML = `<span class="spinner"></span> Аналізую статику...`;
+            btnAskGemini.disabled = true;
+            aiResultContainer.classList.add('hidden');
+
+            const prompt = `Ти — Senior інженер-будівельник. Проаналізуй стан П-подібної тришарнірної рами з консоллю.
+Параметри: проліт L=${currentState.L}м, висота H=${currentState.H}м, консоль Lc=${currentState.Lc}м.
+Навантаження: Сила P: ${currentState.P}, Момент M: ${currentState.M}, Розподілене q: ${currentState.Q}.
+Реакції: Va=${currentState.Va}кН, Vb=${currentState.Vb}кН, Розпір Ha=${currentState.Ha}кН, Hb=${currentState.Hb}кН.
+Максимальне зусилля у системі: ${currentState.maxM}.
+
+Завдання:
+1. Опиши фізичну картину: як навантаження передається через консоль і вузли на опори.
+2. Дай пораду щодо оптимізації (що збільшити/зменшити).
+
+Відповідай лаконічно (2-3 абзаци). Використовуй звичайний текст, виділяй головне жирним шрифтом. Без LaTeX. Відповідай українською мовою.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: "Ти AI-асистент будівельного інженера." }] }
+            };
+
+            try {
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>').replace(/\* (.*?)<br\/>/g, '<ul><li>$1</li></ul>');
+                    aiResultText.innerHTML = formattedText;
+                    aiResultContainer.classList.remove('hidden');
+                    aiResultContainer.classList.add('flex');
+                }
+            } catch (error) {
+                aiResultText.innerHTML = `<span class="text-red-400">Помилка AI-сервера.</span>`;
+                aiResultContainer.classList.remove('hidden');
+                aiResultContainer.classList.add('flex');
+            } finally {
+                btnAskGemini.innerHTML = `✨ Проаналізувати`;
+                btnAskGemini.disabled = false;
+            }
+        });
+
+        // ДРУК ЗНАКІВ (Кружечки з +/-)
+        function drawSign(ctx, cx, cy, sign) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, 9, 0, 2*Math.PI);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = sign > 0 ? '#3b82f6' : '#ef4444';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = sign > 0 ? '#3b82f6' : '#ef4444';
+            ctx.font = "bold 15px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(sign > 0 ? "+" : "-", cx, cy + 1); // +1 для кращого центрування плюса
+        }
+
+
+        function draw(L, H, Lc, Ha, Va, Hb, Vb, getActiveVal, loads, P_mag, M_mag, Q_mag, renderPoints) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 80;
+            const availableWidth = canvas.width - padding * 2;
+            const availableHeight = canvas.height - padding * 2;
+            
+            const totalWidth = L + Lc;
+            const scaleXY = Math.min(availableWidth / Math.max(totalWidth, 4), availableHeight / Math.max(H, 4));
+            const x0 = canvas.width / 2 - (totalWidth * scaleXY) / 2;
+            const y0 = canvas.height - padding - 40; 
+
+            function toPx(x, y) { return { px: x0 + x * scaleXY, py: y0 - y * scaleXY }; }
+
+            let maxVal = 1;
+            ['colL', 'beam', 'cant', 'colR'].forEach(el => {
+                if(el === 'cant' && Lc === 0) return;
+                for(let i=0; i<=100; i++) {
+                    let pos = getPos(el, i/100, L, H, Lc);
+                    let val = getActiveVal(el, pos.x, pos.y);
+                    maxVal = Math.max(maxVal, Math.abs(val));
+                }
+            });
+            const scaleVal = (scaleXY * 0.7) / maxVal; 
+
+            ctx.lineWidth = 1.5;
+            function drawElementDiagram(elem, nx, ny) {
+                if (elem === 'cant' && Lc === 0) return;
+                
+                const steps = 100;
+                let envPoints1 = [];
+                let envPoints2 = []; // Для симетричної епюри N
+                
+                for(let i=0; i<=steps; i++) {
+                    let p = i/steps;
+                    let pos = getPos(elem, p, L, H, Lc);
+                    let val = getActiveVal(elem, pos.x, pos.y);
+                    
+                    if (activeDiagram === 'N') {
+                        // СИМЕТРИЧНЕ ВІДВЕДЕННЯ ДЛЯ N
+                        let ppx1 = toPx(pos.x, pos.y).px - (val/2) * nx * scaleVal;
+                        let ppy1 = toPx(pos.x, pos.y).py - (val/2) * ny * scaleVal;
+                        let ppx2 = toPx(pos.x, pos.y).px + (val/2) * nx * scaleVal;
+                        let ppy2 = toPx(pos.x, pos.y).py + (val/2) * ny * scaleVal;
+                        envPoints1.push({p, pos, val, px: ppx1, py: ppy1});
+                        envPoints2.push({p, pos, val, px: ppx2, py: ppy2});
+                    } else {
+                        // ОДНОСТОРОННЄ ВІДВЕДЕННЯ ДЛЯ M ТА Q
+                        let drawDir = (activeDiagram === 'Q') ? -1 : 1; 
+                        let ppx = toPx(pos.x, pos.y).px - val * nx * scaleVal * drawDir;
+                        let ppy = toPx(pos.x, pos.y).py - val * ny * scaleVal * drawDir; 
+                        envPoints1.push({p, pos, val, px: ppx, py: ppy});
+                    }
+                }
+                
+                ctx.beginPath();
+                if (activeDiagram === 'N') {
+                    // Замикаємо симетричний контур
+                    ctx.moveTo(envPoints1[0].px, envPoints1[0].py);
+                    for(let i=1; i<=steps; i++) ctx.lineTo(envPoints1[i].px, envPoints1[i].py);
+                    for(let i=steps; i>=0; i--) ctx.lineTo(envPoints2[i].px, envPoints2[i].py);
+                } else {
+                    // Замикаємо на вісь для M і Q
+                    let startPos = getPos(elem, 0, L, H, Lc);
+                    ctx.moveTo(toPx(startPos.x, startPos.y).px, toPx(startPos.x, startPos.y).py);
+                    for(let i=0; i<=steps; i++) ctx.lineTo(envPoints1[i].px, envPoints1[i].py);
+                    let endPos = getPos(elem, 1, L, H, Lc);
+                    ctx.lineTo(toPx(endPos.x, endPos.y).px, toPx(endPos.x, endPos.y).py);
+                }
+                ctx.closePath();
+
+                let startP = getPos(elem, 0, L, H, Lc);
+                const grad = ctx.createLinearGradient(0, toPx(startP.x, startP.y).py - 60, 0, toPx(startP.x, startP.y).py + 60);
+                grad.addColorStop(0, 'rgba(239, 68, 68, 0.25)'); 
+                grad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+                grad.addColorStop(1, 'rgba(59, 130, 246, 0.25)'); 
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.strokeStyle = '#64748b';
+                ctx.stroke();
+
+                // Штриховка та розбивка на блоки для знаків
+                let signBlocks = [];
+                let currentSign = 0;
+                let currentBlock = [];
+
+                for(let i=0; i<=steps; i+=4) { // Штрихи частіше
+                    let ep1 = envPoints1[i];
+                    let base = toPx(ep1.pos.x, ep1.pos.y);
+                    
+                    ctx.beginPath();
+                    if (activeDiagram === 'N') {
+                        ctx.moveTo(envPoints2[i].px, envPoints2[i].py);
+                    } else {
+                        ctx.moveTo(base.px, base.py);
+                    }
+                    ctx.lineTo(ep1.px, ep1.py);
+                    
+                    // Колір залежить від знаку: (-) червоний, (+) синій
+                    let s = ep1.val > 0.01 ? 1 : (ep1.val < -0.01 ? -1 : 0);
+                    ctx.strokeStyle = s < 0 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.4)'; 
+                    ctx.stroke();
+
+                    // Логіка групування для малювання знаків +/-
+                    if (s !== currentSign && s !== 0) {
+                        if (currentBlock.length > 0) signBlocks.push({sign: currentSign, pts: currentBlock});
+                        currentBlock = [];
+                        currentSign = s;
+                    }
+                    if (s !== 0) currentBlock.push(ep1);
+                }
+                if (currentBlock.length > 0) signBlocks.push({sign: currentSign, pts: currentBlock});
+
+                // Відмальовування знаків для Q та N
+                if (activeDiagram !== 'M') {
+                    signBlocks.forEach(block => {
+                        if (block.pts.length > 3) { // Малюємо знак тільки якщо блок достатньо великий
+                            let midIndex = Math.floor(block.pts.length / 2);
+                            let pt = block.pts[midIndex];
+                            let cx, cy;
+                            if (activeDiagram === 'N') {
+                                cx = toPx(pt.pos.x, pt.pos.y).px; // N завжди по центру осі
+                                cy = toPx(pt.pos.x, pt.pos.y).py;
+                            } else {
+                                // Q зсунуто від осі до середини висоти епюри
+                                let drawDir = -1;
+                                cx = toPx(pt.pos.x, pt.pos.y).px - (pt.val/2) * nx * scaleVal * drawDir;
+                                cy = toPx(pt.pos.x, pt.pos.y).py - (pt.val/2) * ny * scaleVal * drawDir;
+                            }
+                            drawSign(ctx, cx, cy, block.sign);
+                        }
+                    });
+                }
+            }
+
+            drawElementDiagram('colL', -1, 0);       
+            drawElementDiagram('beam', 0, -1);     
+            drawElementDiagram('cant', 0, -1);
+            drawElementDiagram('colR', 1, 0);  
+
+            // МАЛЮВАННЯ КІСТЯКА РАМИ
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#1e293b';
+            ctx.beginPath();
+            let pA = toPx(0,0), pC1 = toPx(0,H), pC2 = toPx(L,H), pB = toPx(L,0);
+            ctx.moveTo(pA.px, pA.py); ctx.lineTo(pC1.px, pC1.py);
+            ctx.lineTo(pC2.px, pC2.py); ctx.lineTo(pB.px, pB.py);
+            if (Lc > 0) {
+                let pCant = toPx(L + Lc, H);
+                ctx.moveTo(pC2.px, pC2.py); ctx.lineTo(pCant.px, pCant.py);
+            }
+            ctx.stroke();
+
+            let pC = toPx(L/2, H);
+            ctx.beginPath(); ctx.arc(pC.px, pC.py, 6, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.lineWidth = 2.5; ctx.strokeStyle = '#1e293b'; ctx.stroke();
+
+            function drawSupport(px, py) {
+                ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 15, py + 20); ctx.lineTo(px + 15, py + 20); ctx.closePath();
+                ctx.fillStyle = '#cbd5e1'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#1e293b'; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(px - 25, py + 20); ctx.lineTo(px + 25, py + 20); ctx.stroke();
+            }
+            drawSupport(pA.px, pA.py); drawSupport(pB.px, pB.py);
+
+            // МАЛЮВАННЯ НАВАНТАЖЕНЬ
+            let qLoad = loads.find(ld => ld.type === 'q_meta');
+            if (qLoad) {
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.15)'; ctx.strokeStyle = '#16a34a'; ctx.lineWidth = 1;
+                let q_h = 25;
+                if(qLoad.elem === 'beam') {
+                    let pxS = toPx(qLoad.start * L, H).px, pxE = toPx(qLoad.end * L, H).px;
+                    ctx.fillRect(pxS, pC1.py - q_h, pxE - pxS, q_h);
+                    for(let x = pxS + 5; x <= pxE; x += 20) drawArrow(x, pC1.py - q_h, x, pC1.py, '#16a34a', '', 0, 0, 5);
+                    ctx.fillStyle = '#16a34a'; ctx.font="bold 12px Arial"; ctx.fillText(`q`, pxS + (pxE-pxS)/2 - 5, pC1.py - q_h - 5);
+                } else if(qLoad.elem === 'cant') {
+                    let pxS = toPx(L + qLoad.start * Lc, H).px, pxE = toPx(L + qLoad.end * Lc, H).px;
+                    ctx.fillRect(pxS, pC1.py - q_h, pxE - pxS, q_h);
+                    for(let x = pxS + 5; x <= pxE; x += 20) drawArrow(x, pC1.py - q_h, x, pC1.py, '#16a34a', '', 0, 0, 5);
+                    ctx.fillStyle = '#16a34a'; ctx.font="bold 12px Arial"; ctx.fillText(`q`, pxS + (pxE-pxS)/2 - 5, pC1.py - q_h - 5);
+                } else if(qLoad.elem === 'colL') {
+                    let pyBot = toPx(0, qLoad.start * H).py, pyTop = toPx(0, qLoad.end * H).py;
+                    ctx.fillRect(pA.px - q_h, pyTop, q_h, pyBot - pyTop);
+                    for(let y = pyTop + 5; y <= pyBot; y += 20) drawArrow(pA.px - q_h, y, pA.px, y, '#16a34a', '', 0, 0, 5);
+                    ctx.fillStyle = '#16a34a'; ctx.font="bold 12px Arial"; 
+                    ctx.save(); ctx.translate(pA.px - q_h - 5, pyTop + (pyBot-pyTop)/2); ctx.rotate(-Math.PI/2); ctx.fillText(`q`, -5, 0); ctx.restore();
+                } else if(qLoad.elem === 'colR') {
+                    let pyTop = toPx(L, H - qLoad.start * H).py, pyBot = toPx(L, H - qLoad.end * H).py;
+                    ctx.fillRect(pB.px, pyTop, q_h, pyBot - pyTop);
+                    for(let y = pyTop + 5; y <= pyBot; y += 20) drawArrow(pB.px + q_h, y, pB.px, y, '#16a34a', '', 0, 0, 5);
+                    ctx.fillStyle = '#16a34a'; ctx.font="bold 12px Arial"; 
+                    ctx.save(); ctx.translate(pB.px + q_h + 15, pyTop + (pyBot-pyTop)/2); ctx.rotate(Math.PI/2); ctx.fillText(`q`, -5, 0); ctx.restore();
+                }
+            }
+
+            if (P_mag > 0) {
+                let mainLoad = loads.find(l => l.type === 'P');
+                let lp = toPx(mainLoad.x, mainLoad.y);
+                let ax = lp.px, ay = lp.py, bx = lp.px, by = lp.py;
+                if(mainLoad.fy < 0) ay -= 40; else if(mainLoad.fx > 0) ax -= 40; 
+                drawArrow(ax, ay, bx, by, '#dc2626', `P`, mainLoad.fx > 0 ? -15 : 5, mainLoad.fy < 0 ? -30 : -5, 8);
+            }
+
+            if (Math.abs(M_mag) > 0) {
+                let mainLoad = loads.find(l => l.type === 'M');
+                let lp = toPx(mainLoad.x, mainLoad.y);
+                ctx.beginPath(); ctx.arc(lp.px, lp.py, 18, Math.PI * 1.2, Math.PI * 2.8, M_mag > 0);
+                ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3; ctx.stroke();
+                let arrowAng = M_mag > 0 ? (Math.PI * 1.2 + Math.PI/2) : (Math.PI * 2.8 - Math.PI/2);
+                let hx = lp.px + 18 * Math.cos(Math.PI * (M_mag > 0 ? 1.2 : 2.8));
+                let hy = lp.py + 18 * Math.sin(Math.PI * (M_mag > 0 ? 1.2 : 2.8));
+                ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI*2); ctx.fillStyle='#f97316'; ctx.fill();
+                ctx.font = "bold 13px Arial"; ctx.fillText(`M`, lp.px + 20, lp.py - 20);
+            }
+
+            // МАРКЕРИ ЧИСЛОВИХ ЗНАЧЕНЬ
+            let uniquePoints = [];
+            renderPoints.forEach(pt => {
+                if(pt.elem === 'cant' && Lc === 0) return;
+                let isDup = false;
+                uniquePoints.forEach(up => {
+                    if (up.elem === pt.elem && Math.abs(up.p - pt.p) < 0.01) isDup = true;
+                });
+                if(!isDup) uniquePoints.push(pt);
+            });
+
+            uniquePoints.forEach(pt => {
+                let pos = getPos(pt.elem, pt.p, L, H, Lc);
+                let val = getActiveVal(pt.elem, pos.x, pos.y);
+                
+                if (Math.abs(val) >= 0.01) {
+                    let nx = 0, ny = 0;
+                    if (pt.elem === 'colL') { nx = -1; ny = 0; } 
+                    else if (pt.elem === 'beam' || pt.elem === 'cant') { nx = 0; ny = -1; } 
+                    else if (pt.elem === 'colR') { nx = 1; ny = 0; }
+
+                    let ptPx = toPx(pos.x, pos.y);
+                    let ex, ey;
+
+                    if (activeDiagram === 'N') {
+                        // Для N маркер ставимо на краю симетричної епюри (щоб не перекривати знак в центрі)
+                        ex = ptPx.px - (val/2) * nx * scaleVal;
+                        ey = ptPx.py - (val/2) * ny * scaleVal;
+                    } else {
+                        let drawDir = (activeDiagram === 'Q') ? -1 : 1; 
+                        ex = ptPx.px - val * nx * scaleVal * drawDir;
+                        ey = ptPx.py - val * ny * scaleVal * drawDir;
+                    }
+
+                    ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI*2);
+                    ctx.fillStyle = val < 0 ? '#ef4444' : '#3b82f6'; ctx.fill();
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+
+                    ctx.fillStyle = '#0f172a'; ctx.font = "bold 11px Arial";
+                    let textOffsetX = 0, textOffsetY = 0;
+                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+                    if (nx === -1) { ctx.textAlign = val < 0 ? "right" : "left"; textOffsetX = val < 0 ? -6 : 8; } 
+                    else if (nx === 1) { ctx.textAlign = val < 0 ? "left" : "right"; textOffsetX = val < 0 ? 8 : -6; } 
+                    else if (ny === -1) { ctx.textBaseline = val < 0 ? "bottom" : "top"; textOffsetY = val < 0 ? -6 : 8; }
+
+                    ctx.fillText(Math.abs(val).toFixed(1), ex + textOffsetX, ey + textOffsetY);
+                }
+            });
+
+            // Для епюри M обов'язково показуємо нуль у шарнірі
+            if (activeDiagram === 'M') {
+                ctx.fillStyle = '#0f172a'; ctx.font = "bold 11px Arial";
+                ctx.fillText("0", toPx(L/2, H).px - 5, toPx(L/2, H).py + 16);
+            }
+        }
+
+        function drawArrow(x1, y1, x2, y2, color, label, txtOx, txtOy, headSize=8) {
+            ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headSize * Math.cos(angle - Math.PI / 6), y2 - headSize * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headSize * Math.cos(angle + Math.PI / 6), y2 - headSize * Math.sin(angle + Math.PI / 6));
+            ctx.closePath(); ctx.fill();
+            if(label) { ctx.font = "bold 11px Arial"; ctx.fillText(label, x1 + txtOx, y1 + txtOy); }
+        }
+
+        setTimeout(resizeCanvas, 100);
+    </script>
+</body>
+</html>
